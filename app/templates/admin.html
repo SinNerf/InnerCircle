@@ -1,0 +1,195 @@
+{% extends "base.html" %}
+{% block title %}Admin — InnerCircle{% endblock %}
+
+{% block extra_css %}
+.section { margin-bottom: 2rem; }
+.section h2 { font-size: 1.15rem; margin-bottom: .75rem; }
+.empty { color: var(--text-faint); font-style: italic; font-size: .85rem; }
+.row { background: var(--bg-card); border-radius: 8px; box-shadow: var(--shadow); padding: .85rem 1rem; display: flex; justify-content: space-between; align-items: center; margin-bottom: .5rem; flex-wrap: wrap; gap: .5rem; }
+.row .info { flex: 1; min-width: 0; }
+.row .info .name { font-weight: 600; font-size: .9rem; }
+.row .info .detail { font-size: .78rem; color: var(--text-muted); }
+.row .actions { display: flex; gap: .4rem; flex-shrink: 0; align-items: center; flex-wrap: wrap; }
+.approve-form { display: flex; gap: .35rem; align-items: center; margin: 0; }
+.approve-form input[name="title"] { width: 130px; margin: 0; padding: .3rem .5rem; font-size: .78rem; }
+.admin-links { display: flex; gap: .75rem; margin-bottom: 1.25rem; }
+.corner-row { background: var(--bg-hover); border-radius: 7px; padding: .65rem .85rem; margin-bottom: .4rem; display: flex; align-items: center; gap: .6rem; }
+.corner-row .c-icon { font-size: 1.2rem; flex-shrink: 0; }
+.corner-row .c-info { flex: 1; min-width: 0; }
+.corner-row .c-name { font-weight: 600; font-size: .88rem; }
+.corner-row .c-meta { font-size: .72rem; color: var(--text-faint); }
+.add-corner-form { margin-top: 1rem; }
+.add-corner-form .form-row { margin-bottom: .65rem; }
+.add-corner-form label { font-size: .78rem; margin-bottom: .15rem; }
+.add-corner-form input, .add-corner-form select { margin-bottom: 0; }
+.add-corner-form .inline-group { display: flex; gap: .5rem; }
+.add-corner-form .inline-group > * { flex: 1; min-width: 0; }
+{% endblock %}
+
+{% block body %}
+<div class="container">
+  {% if queued %}
+  <div class="alert-success mb-2">Action submitted for Architect approval.</div>
+  {% endif %}
+
+  <div class="admin-links">
+    <a href="/admin/users" class="btn btn-ghost">All Users</a>
+  </div>
+
+  {# --- Pending Actions (Architect only) --- #}
+  {% if user.rank >= 12 and pending_actions %}
+  <div class="section">
+    <h2>Pending Admin Actions</h2>
+    {% for a in pending_actions %}
+    <div class="row">
+      <div class="info">
+        <div class="name">{{ action_summaries[a.id] }}</div>
+        <div class="detail">by {{ a_admins[a.admin_id].username if a.admin_id in a_admins else '?' }} &middot; {{ a.created_at.strftime('%Y-%m-%d %H:%M') }}</div>
+      </div>
+      <div class="actions">
+        <form method="post" action="/admin/actions/{{ a.id }}/approve" style="margin:0;">
+          <button class="btn btn-ghost btn-sm" type="submit">Approve</button>
+        </form>
+        <form method="post" action="/admin/actions/{{ a.id }}/reject" style="margin:0;">
+          <button class="btn btn-danger btn-sm" type="submit">Reject</button>
+        </form>
+      </div>
+    </div>
+    {% endfor %}
+  </div>
+  {% endif %}
+
+  {# --- Pending Registrations --- #}
+  <div class="section">
+    <h2>Pending Registrations</h2>
+    {% if pending_users %}
+      {% for u in pending_users %}
+      <div class="row">
+        <div class="info">
+          <div class="name">{{ u.username }}</div>
+          <div class="detail">{{ u.bio or 'No bio' }} &middot; {{ u.created_at.strftime('%Y-%m-%d %H:%M') }}</div>
+        </div>
+        <div class="actions">
+          <form class="approve-form" method="post" action="/admin/approve/{{ u.id }}">
+            <input type="text" name="title" placeholder="Title (optional)" maxlength="100">
+            <button class="btn btn-ghost btn-sm" type="submit">Accept</button>
+          </form>
+          <form method="post" action="/admin/decline/{{ u.id }}" style="margin:0;">
+            <button class="btn btn-danger btn-sm" type="submit">Decline</button>
+          </form>
+        </div>
+      </div>
+      {% endfor %}
+    {% else %}
+    <p class="empty">No pending registrations.</p>
+    {% endif %}
+  </div>
+
+  {# --- Pending Suggestions --- #}
+  <div class="section">
+    <h2>Pending Suggestions</h2>
+    {% if pending_suggestions %}
+      {% for s in pending_suggestions %}
+      <div class="row">
+        <div class="info">
+          <div class="name"><a href="/corners/suggestions/{{ s.id }}">{{ s.title }}</a></div>
+          <div class="detail">by {{ s_authors[s.author_id].username if s.author_id in s_authors else 'Unknown' }} &middot; {{ s.created_at.strftime('%Y-%m-%d') }}</div>
+        </div>
+        <div class="actions">
+          <form method="post" action="/admin/suggestion/approve/{{ s.id }}" style="margin:0;">
+            <button class="btn btn-ghost btn-sm" type="submit">Approve</button>
+          </form>
+          <form method="post" action="/corners/suggestions/{{ s.id }}/delete" style="margin:0;">
+            <button class="btn btn-danger btn-sm" type="submit">Delete</button>
+          </form>
+        </div>
+      </div>
+      {% endfor %}
+    {% else %}
+    <p class="empty">No pending suggestions.</p>
+    {% endif %}
+  </div>
+
+  {# --- Banned Users --- #}
+  <div class="section">
+    <h2>Banned Users</h2>
+    {% if banned_users %}
+      {% for u in banned_users %}
+      <div class="row">
+        <div class="info">
+          <div class="name"><a href="/user/{{ u.username }}">{{ u.username }}</a></div>
+          <div class="detail">Banned &middot; joined {{ u.created_at.strftime('%Y-%m-%d') }}</div>
+        </div>
+        <div class="actions">
+          <form method="post" action="/admin/unban/{{ u.id }}" style="margin:0;">
+            <button class="btn btn-ghost btn-sm" type="submit">Unban</button>
+          </form>
+        </div>
+      </div>
+      {% endfor %}
+    {% else %}
+    <p class="empty">No banned users.</p>
+    {% endif %}
+  </div>
+
+  {# --- Corners Management --- #}
+  <div class="section">
+    <h2>Corners</h2>
+
+    {% if corners %}
+    <div style="margin-bottom:.5rem;">
+      {% for c in corners %}
+      <div class="corner-row">
+        <span class="c-icon">{{ c.icon }}</span>
+        <div class="c-info">
+          <div class="c-name">{{ c.name }}</div>
+          <div class="c-meta">/corners/{{ c.slug }} &middot; {{ c.template_type }}-style</div>
+        </div>
+      </div>
+      {% endfor %}
+    </div>
+    {% else %}
+    <p class="empty mb-2">No corners yet.</p>
+    {% endif %}
+
+    <div class="add-corner-form card card-sm">
+      <div style="font-weight:600; font-size:.92rem; margin-bottom:.75rem;">Add New Corner</div>
+
+      <form method="post" action="/admin/corner">
+        <div class="form-row inline-group">
+          <div>
+            <label for="c-name">Name</label>
+            <input id="c-name" name="name" placeholder="e.g. Feedback" required>
+          </div>
+          <div>
+            <label for="c-slug">Slug (URL path)</label>
+            <input id="c-slug" name="slug" placeholder="e.g. feedback" required>
+          </div>
+          <div style="flex:0 0 80px;">
+            <label for="c-icon">Icon</label>
+            <input id="c-icon" name="icon" placeholder="emoji" maxlength="4">
+          </div>
+        </div>
+
+        <div class="form-row">
+          <label for="c-desc">Description</label>
+          <input id="c-desc" name="description" placeholder="Short description of this channel">
+        </div>
+
+        <div class="form-row inline-group" style="align-items:flex-end;">
+          <div>
+            <label for="c-type">Template Type</label>
+            <select id="c-type" name="template_type">
+              <option value="library">Library-style (posts + views)</option>
+              <option value="suggestions">Suggestions-style (posts + votes)</option>
+            </select>
+          </div>
+          <div style="flex:0 0 auto;">
+            <button class="btn btn-primary" type="submit" style="margin-bottom:0;">Create Corner</button>
+          </div>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+{% endblock %}

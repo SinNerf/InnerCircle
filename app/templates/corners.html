@@ -1,0 +1,52 @@
+{% extends "base.html" %}
+{% block title %}Corners — InnerCircle{% endblock %}
+
+{% block extra_css %}
+.hub { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; }
+@media (max-width: 600px) { .hub { grid-template-columns: 1fr; } }
+.channel { background: var(--bg-card); border-radius: 10px; box-shadow: var(--shadow); padding: 1.5rem; transition: background .2s, transform .1s; text-decoration: none; color: var(--text); display: block; }
+.channel:hover { transform: translateY(-2px); text-decoration: none; }
+.channel h3 { font-size: 1.1rem; margin-bottom: .35rem; }
+.channel p { font-size: .82rem; color: var(--text-muted); line-height: 1.4; }
+.channel .icon { font-size: 1.5rem; margin-bottom: .5rem; }
+.search-box { display: flex; gap: .5rem; margin-bottom: 1.75rem; }
+.search-box input { margin-bottom: 0; flex: 1; }
+.result-card { background: var(--bg-card); border-radius: 10px; box-shadow: var(--shadow); padding: 1.25rem; margin-bottom: 1.5rem; display: flex; align-items: center; justify-content: space-between; }
+.result-card .info h3 { font-size: 1rem; margin-bottom: .15rem; }
+.result-card .info p { font-size: .8rem; color: var(--text-muted); }
+{% endblock %}
+
+{% block body %}
+<div class="container">
+  <h2 class="mb-2" style="font-size:1.3rem;">Find a member</h2>
+  <form class="search-box" action="/corners" method="get">
+    <input type="text" name="q" placeholder="Enter exact username" value="{{ q }}" required>
+    <button class="btn btn-primary" type="submit">Search</button>
+  </form>
+
+  {% if search_error %}
+  <div class="alert-error mb-2">{{ search_error }}</div>
+  {% endif %}
+
+  {% if search_result %}
+  <div class="result-card">
+    <div class="info">
+      <h3>{{ search_result.username }}</h3>
+      <p>{{ search_result.bio or 'No bio' }}</p>
+    </div>
+    <a href="/user/{{ search_result.username }}" class="btn btn-ghost">View Profile</a>
+  </div>
+  {% endif %}
+
+  <h2 class="mb-2" style="font-size:1.3rem;">Channels</h2>
+  <div class="hub">
+    {% for ch in channels %}
+    <a href="/corners/{{ ch.slug }}" class="channel">
+      <div class="icon">{{ ch.icon }}</div>
+      <h3>{{ ch.name }}</h3>
+      <p>{{ ch.description }}</p>
+    </a>
+    {% endfor %}
+  </div>
+</div>
+{% endblock %}

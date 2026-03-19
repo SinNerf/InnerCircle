@@ -1,0 +1,135 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>{% block title %}InnerCircle{% endblock %}</title>
+  <style>
+    :root {
+      --bg: #e9ebf0; --bg-card: #f8f8fa; --bg-hover: #f0f1f4;
+      --text: #1a1a2e; --text-muted: #555; --text-faint: #888;
+      --border: #dcdee3; --border-light: #ececef;
+      --primary: #4f46e5; --primary-hover: #4338ca; --primary-faint: rgba(79,70,229,.08);
+      --danger: #b91c1c; --danger-bg: #fee2e2; --danger-border: #fecaca;
+      --success: #15803d; --success-bg: #dcfce7; --success-border: #bbf7d0;
+      --shadow: 0 4px 24px rgba(0,0,0,.08);
+    }
+    body.dark {
+      --bg: #0f0f1a; --bg-card: #1a1a2e; --bg-hover: #22223a;
+      --text: #e2e2ef; --text-muted: #9999b0; --text-faint: #555568;
+      --border: #2a2a3e; --border-light: #22223a;
+      --primary: #818cf8; --primary-hover: #6366f1; --primary-faint: rgba(129,140,248,.1);
+      --danger: #f87171; --danger-bg: rgba(248,113,113,.1); --danger-border: rgba(248,113,113,.2);
+      --success: #4ade80; --success-bg: rgba(74,222,128,.1); --success-border: rgba(74,222,128,.2);
+      --shadow: 0 4px 24px rgba(0,0,0,.3);
+    }
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: system-ui, -apple-system, sans-serif; background: var(--bg); color: var(--text); min-height: 100vh; transition: background .2s, color .2s; }
+    a { color: var(--primary); text-decoration: none; font-weight: 600; }
+    a:hover { text-decoration: underline; }
+
+    @media (min-width: 1200px) { html { font-size: 112%; } }
+    @media (min-width: 1600px) { html { font-size: 120%; } }
+
+    nav { background: var(--bg-card); border-bottom: 1px solid var(--border); padding: .7rem 1.5rem; display: flex; align-items: center; gap: 1.25rem; transition: background .2s, border .2s; }
+    nav .brand { font-weight: 700; font-size: 1.1rem; color: var(--primary); text-decoration: none; margin-right: auto; }
+    nav a { font-size: .85rem; }
+    .theme-btn { width: 34px; height: 34px; border-radius: 50%; border: 1px solid var(--border); background: var(--bg); color: var(--text); cursor: pointer; font-size: 1rem; display: flex; align-items: center; justify-content: center; transition: all .15s; flex-shrink: 0; }
+    .theme-btn:hover { border-color: var(--primary); }
+
+    .notif-link { position: relative; font-size: .95rem; text-decoration: none !important; }
+    .notif-badge { position: absolute; top: -7px; right: -9px; background: var(--danger); color: #fff; font-size: .55rem; font-weight: 700; padding: .1rem .32rem; border-radius: 50%; min-width: 14px; text-align: center; line-height: 1.2; }
+
+    .container { max-width: 720px; margin: 2rem auto; padding: 0 1rem; }
+    .card { background: var(--bg-card); border-radius: 10px; box-shadow: var(--shadow); padding: 1.75rem; transition: background .2s; }
+    .card-sm { padding: 1.25rem; }
+
+    label { display: block; font-weight: 600; margin-bottom: .2rem; font-size: .82rem; }
+    input, textarea, select { width: 100%; padding: .6rem .7rem; border: 1px solid var(--border); border-radius: 7px; font-size: .9rem; margin-bottom: .85rem; background: var(--bg); color: var(--text); transition: border .15s; }
+    input:focus, textarea:focus { outline: none; border-color: var(--primary); box-shadow: 0 0 0 3px var(--primary-faint); }
+    textarea { resize: vertical; min-height: 120px; font-family: inherit; }
+
+    .btn { display: inline-block; padding: .55rem 1.1rem; border-radius: 7px; font-size: .85rem; font-weight: 600; border: none; cursor: pointer; transition: background .15s, transform .1s; text-decoration: none; }
+    .btn:hover { text-decoration: none; }
+    .btn:active { transform: scale(.97); }
+    .btn-primary { background: var(--primary); color: #fff; }
+    .btn-primary:hover { background: var(--primary-hover); }
+    .btn-danger { background: var(--danger-bg); color: var(--danger); border: 1px solid var(--danger-border); }
+    .btn-danger:hover { opacity: .85; }
+    .btn-ghost { background: var(--primary-faint); color: var(--primary); }
+    .btn-ghost:hover { opacity: .85; }
+    .btn-block { width: 100%; text-align: center; }
+    .btn-sm { padding: .3rem .6rem; font-size: .75rem; }
+
+    .alert-error { background: var(--danger-bg); color: var(--danger); border: 1px solid var(--danger-border); padding: .6rem .7rem; border-radius: 7px; margin-bottom: .85rem; font-size: .85rem; }
+    .alert-success { background: var(--success-bg); color: var(--success); border: 1px solid var(--success-border); padding: .6rem .7rem; border-radius: 7px; margin-bottom: .85rem; font-size: .85rem; }
+
+    .text-muted { color: var(--text-muted); }
+    .text-faint { color: var(--text-faint); }
+    .text-sm { font-size: .8rem; }
+    .text-center { text-align: center; }
+    .mt-1 { margin-top: .5rem; }
+    .mt-2 { margin-top: 1rem; }
+    .mt-3 { margin-top: 1.5rem; }
+    .mb-1 { margin-bottom: .5rem; }
+    .mb-2 { margin-bottom: 1rem; }
+    .flex { display: flex; }
+    .gap-1 { gap: .5rem; }
+    .gap-2 { gap: .75rem; }
+    .items-center { align-items: center; }
+    .justify-between { justify-content: space-between; }
+    .flex-wrap { flex-wrap: wrap; }
+
+    .stat-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: .75rem; }
+    .stat-box { background: var(--primary-faint); border-radius: 8px; padding: 1rem; text-align: center; }
+    .stat-box .num { font-size: 1.5rem; font-weight: 700; color: var(--primary); }
+    .stat-box .label { font-size: .75rem; color: var(--text-muted); margin-top: .15rem; }
+
+    table { width: 100%; border-collapse: collapse; }
+    th, td { text-align: left; padding: .7rem .85rem; }
+    th { font-size: .75rem; text-transform: uppercase; letter-spacing: .04em; color: var(--text-muted); border-bottom: 1px solid var(--border); }
+    td { border-bottom: 1px solid var(--border-light); font-size: .85rem; }
+    tr:last-child td { border-bottom: none; }
+
+    .title-badge { display: inline-block; font-size: .7rem; padding: .15rem .45rem; border-radius: 4px; font-weight: 600; background: var(--primary-faint); color: var(--primary); margin-right: .3rem; margin-bottom: .2rem; }
+    .rank-badge { display: inline-block; font-size: .68rem; padding: .15rem .5rem; border-radius: 4px; font-weight: 700; background: var(--primary); color: #fff; }
+
+    .comment-card { background: var(--bg-hover); border-radius: 8px; padding: .85rem 1rem; margin-bottom: .5rem; }
+    .comment-header { display: flex; align-items: center; gap: .5rem; margin-bottom: .35rem; flex-wrap: wrap; }
+    .comment-body { font-size: .85rem; line-height: 1.5; white-space: pre-wrap; word-wrap: break-word; }
+    .reply-card { background: var(--bg); border-radius: 6px; padding: .6rem .8rem; margin-top: .4rem; margin-left: 1.2rem; }
+
+    {% block extra_css %}{% endblock %}
+  </style>
+  <script>
+    if (localStorage.getItem('theme') === 'dark') document.documentElement.className = 'dark-pending';
+  </script>
+</head>
+<body>
+  {% block nav %}
+  <nav>
+    <a href="/corners" class="brand">InnerCircle</a>
+    {% if user is defined and user %}
+    <a href="/corners">Corners</a>
+    <a href="/dashboard">Dashboard</a>
+    {% if user.rank >= 11 %}<a href="/admin">Admin</a>{% endif %}
+    <a href="/notifications" class="notif-link">&#128276;{% if unread_count %}<span class="notif-badge">{{ unread_count }}</span>{% endif %}</a>
+    <a href="/logout">Log out</a>
+    {% endif %}
+    <button class="theme-btn" onclick="toggleTheme()" title="Toggle theme"><span id="ti"></span></button>
+  </nav>
+  {% endblock %}
+
+  {% block body %}{% endblock %}
+
+  <script>
+    (function(){
+      var d = document.body;
+      if (localStorage.getItem('theme') === 'dark') d.classList.add('dark');
+      function upd(){ document.getElementById('ti').textContent = d.classList.contains('dark') ? '\u2600' : '\u263E'; }
+      window.toggleTheme = function(){ d.classList.toggle('dark'); localStorage.setItem('theme', d.classList.contains('dark') ? 'dark' : 'light'); upd(); };
+      upd();
+    })();
+  </script>
+</body>
+</html>

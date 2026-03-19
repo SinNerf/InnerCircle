@@ -1,0 +1,24 @@
+{% extends "base.html" %}
+{% block title %}New Suggestion — InnerCircle{% endblock %}
+
+{% block body %}
+<div class="container" style="max-width:620px;">
+  <div class="card">
+    <h2 style="font-size:1.2rem; margin-bottom:1rem;">New Suggestion</h2>
+
+    {% if error %}
+    <div class="alert-error">{{ error }}</div>
+    {% endif %}
+
+    <form method="post" action="/corners/suggestions/write">
+      <label for="title">Title</label>
+      <input id="title" name="title" type="text" required maxlength="200" placeholder="What would you like to change?">
+
+      <label for="body">Description</label>
+      <textarea id="body" name="body" required placeholder="Explain your suggestion in detail..."></textarea>
+
+      <button class="btn btn-primary btn-block" type="submit">Submit Suggestion</button>
+    </form>
+  </div>
+</div>
+{% endblock %}

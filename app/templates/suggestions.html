@@ -1,0 +1,67 @@
+{% extends "base.html" %}
+{% block title %}Suggestions — InnerCircle{% endblock %}
+
+{% block extra_css %}
+.header-row { display: flex; align-items: center; justify-content: space-between; margin-bottom: .75rem; flex-wrap: wrap; gap: .5rem; }
+.header-row h2 { font-size: 1.3rem; }
+.tabs { display: flex; gap: .35rem; margin-bottom: .75rem; }
+.tab { padding: .4rem .9rem; border-radius: 6px; font-size: .82rem; font-weight: 600; text-decoration: none; color: var(--text-muted); background: var(--primary-faint); transition: all .15s; }
+.tab:hover { text-decoration: none; opacity: .85; }
+.tab.active { background: var(--primary); color: #fff; }
+.filters { display: flex; gap: .35rem; margin-bottom: 1rem; }
+.filter-btn { padding: .3rem .7rem; border-radius: 5px; font-size: .75rem; font-weight: 600; text-decoration: none; color: var(--text-muted); background: transparent; border: 1px solid var(--border); transition: all .15s; }
+.filter-btn:hover { text-decoration: none; border-color: var(--primary); }
+.filter-btn.active { background: var(--primary-faint); color: var(--primary); border-color: var(--primary); }
+.s-card { background: var(--bg-card); border-radius: 10px; box-shadow: var(--shadow); padding: 1rem 1.25rem; margin-bottom: .6rem; display: flex; gap: 1rem; align-items: flex-start; transition: background .2s; }
+.s-votes { display: flex; flex-direction: column; align-items: center; gap: .15rem; flex-shrink: 0; min-width: 44px; }
+.s-votes .score { font-weight: 700; font-size: 1rem; color: var(--primary); }
+.s-votes .arrow { font-size: .75rem; color: var(--text-faint); cursor: default; }
+.s-body { flex: 1; min-width: 0; }
+.s-body h3 { font-size: .95rem; margin-bottom: .2rem; }
+.s-body h3 a { color: var(--text); }
+.s-body h3 a:hover { color: var(--primary); }
+.s-meta { font-size: .75rem; color: var(--text-muted); }
+.empty { color: var(--text-faint); font-style: italic; text-align: center; padding: 2rem 0; }
+{% endblock %}
+
+{% block body %}
+<div class="container">
+  <div class="header-row">
+    <h2>Suggestions</h2>
+    <a href="/corners/suggestions/write" class="btn btn-primary">New Suggestion</a>
+  </div>
+
+  <div class="tabs">
+    <a href="/corners/suggestions?tab=open&sort={{ sort }}" class="tab {{ 'active' if tab == 'open' else '' }}">Open</a>
+    <a href="/corners/suggestions?tab=approved&sort={{ sort }}" class="tab {{ 'active' if tab == 'approved' else '' }}">Approved</a>
+  </div>
+
+  <div class="filters">
+    <a href="/corners/suggestions?tab={{ tab }}&sort=new" class="filter-btn {{ 'active' if sort == 'new' else '' }}">Newest</a>
+    <a href="/corners/suggestions?tab={{ tab }}&sort=top" class="filter-btn {{ 'active' if sort == 'top' else '' }}">Most Upvoted</a>
+  </div>
+
+  {% if items %}
+    {% for item in items %}
+    <div class="s-card">
+      <div class="s-votes">
+        <span class="arrow" style="color:{{ 'var(--primary)' if item.my_vote == 1 else 'var(--text-faint)' }}">&#9650;</span>
+        <span class="score">{{ item.score }}</span>
+        <span class="arrow" style="color:{{ 'var(--danger)' if item.my_vote == -1 else 'var(--text-faint)' }}">&#9660;</span>
+      </div>
+      <div class="s-body">
+        <h3><a href="/corners/suggestions/{{ item.s.id }}">{{ item.s.title }}</a></h3>
+        <div class="s-meta">
+          by {{ authors[item.s.author_id].username if item.s.author_id in authors else 'Unknown' }}
+          &middot; {{ item.up }} up / {{ item.down }} down
+          &middot; {{ item.s.created_at.strftime('%b %d, %Y') }}
+          {% if item.s.is_approved %}&middot; <span style="color:var(--success);">Approved</span>{% endif %}
+        </div>
+      </div>
+    </div>
+    {% endfor %}
+  {% else %}
+  <p class="empty">No suggestions yet. Be the first to post one.</p>
+  {% endif %}
+</div>
+{% endblock %}

@@ -1,0 +1,56 @@
+{# Include this partial in detail pages. Expects: comments, can_comment, target_type, target_id, user #}
+<div style="margin-top:2rem; padding-top:1rem; border-top:1px solid var(--border);">
+  <h3 style="font-size:.95rem; margin-bottom:.75rem;">Comments</h3>
+
+  {% if can_comment %}
+  <form method="post" action="/comment/{{ target_type }}/{{ target_id }}" style="margin-bottom:1rem;">
+    <textarea name="content" required placeholder="Leave a comment..." style="min-height:60px;"></textarea>
+    <button class="btn btn-primary btn-sm" type="submit">Comment</button>
+  </form>
+  {% elif not has_privilege(user, "comment") %}
+  <p class="text-faint text-sm mb-2" style="font-style:italic;">Reach Insider rank (3) to comment.</p>
+  {% else %}
+  <p class="text-faint text-sm mb-2" style="font-style:italic;">You've already commented. Reach Elite rank (7) for unlimited comments.</p>
+  {% endif %}
+
+  {% if comments %}
+    {% for item in comments %}
+    <div class="comment-card">
+      <div class="comment-header">
+        <a href="/user/{{ item.author.username }}" style="font-size:.82rem;">{{ item.author.username }}</a>
+        <span class="text-faint text-sm">{{ item.c.created_at.strftime('%b %d, %Y') }}</span>
+        {% if has_privilege(user, "admin") %}
+        <form method="post" action="/comment/{{ item.c.id }}/delete" style="margin:0;">
+          <button class="btn btn-danger" style="padding:.15rem .4rem; font-size:.65rem;" type="submit">Del</button>
+        </form>
+        {% endif %}
+      </div>
+      <div class="comment-body">{{ item.c.content }}</div>
+
+      {% for reply in item.replies %}
+      <div class="reply-card">
+        <div class="comment-header">
+          <a href="/user/{{ reply.author.username }}" style="font-size:.78rem;">{{ reply.author.username }}</a>
+          <span class="text-faint" style="font-size:.72rem;">{{ reply.c.created_at.strftime('%b %d, %Y') }}</span>
+          {% if has_privilege(user, "admin") %}
+          <form method="post" action="/comment/{{ reply.c.id }}/delete" style="margin:0;">
+            <button class="btn btn-danger" style="padding:.12rem .35rem; font-size:.6rem;" type="submit">Del</button>
+          </form>
+          {% endif %}
+        </div>
+        <div class="comment-body" style="font-size:.82rem;">{{ reply.c.content }}</div>
+      </div>
+      {% endfor %}
+
+      {% if has_privilege(user, "reply") %}
+      <form method="post" action="/comment/{{ item.c.id }}/reply" style="display:flex; gap:.35rem; margin-top:.4rem; margin-left:1.2rem;">
+        <input name="content" placeholder="Reply..." maxlength="2000" required style="margin:0; flex:1; font-size:.8rem; padding:.3rem .5rem;">
+        <button class="btn btn-ghost btn-sm" type="submit">Reply</button>
+      </form>
+      {% endif %}
+    </div>
+    {% endfor %}
+  {% else %}
+  <p class="text-faint text-sm" style="font-style:italic;">No comments yet.</p>
+  {% endif %}
+</div>

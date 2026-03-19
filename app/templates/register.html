@@ -1,0 +1,45 @@
+{% extends "base.html" %}
+{% block title %}Register — InnerCircle{% endblock %}
+
+{% block nav %}
+<nav>
+  <a href="/" class="brand">InnerCircle</a>
+  <button class="theme-btn" onclick="toggleTheme()" title="Toggle theme"><span id="ti"></span></button>
+</nav>
+{% endblock %}
+
+{% block extra_css %}
+.form-wrap { max-width: 400px; margin: 3rem auto; padding: 0 1rem; }
+{% endblock %}
+
+{% block body %}
+<div class="form-wrap">
+  <div class="card">
+    <h1 style="font-size:1.35rem; margin-bottom:.15rem;">Create Account</h1>
+    <p class="text-muted text-sm mb-2">Join InnerCircle — an admin will review your request.</p>
+
+    {% if error %}
+    <div class="alert-error">{{ error }}</div>
+    {% endif %}
+
+    {% if pending %}
+    <div class="alert-success">Registration submitted! An admin will review your account shortly.</div>
+    {% else %}
+    <form method="post" action="/register">
+      <label for="username">Username</label>
+      <input id="username" name="username" type="text" required minlength="3" maxlength="64" autocomplete="username" placeholder="Pick a username">
+
+      <label for="password">Password</label>
+      <input id="password" name="password" type="password" required minlength="6" autocomplete="new-password" placeholder="Min 6 characters">
+
+      <label for="bio">Bio <span style="font-weight:400;color:var(--text-faint);">(optional)</span></label>
+      <textarea id="bio" name="bio" maxlength="500" placeholder="Tell us about yourself" style="min-height:70px;"></textarea>
+
+      <button class="btn btn-primary btn-block" type="submit">Register</button>
+    </form>
+    {% endif %}
+
+    <p class="text-center text-sm mt-2">Already have an account? <a href="/login">Log in</a></p>
+  </div>
+</div>
+{% endblock %}

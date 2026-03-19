@@ -1,0 +1,97 @@
+{% extends "base.html" %}
+{% block title %}Dashboard — InnerCircle{% endblock %}
+
+{% block extra_css %}
+.greeting { font-size: 1.4rem; margin-bottom: .2rem; }
+.bio { color: var(--text-muted); font-size: .9rem; line-height: 1.5; margin-bottom: .5rem; }
+.meta { font-size: .78rem; color: var(--text-faint); margin-bottom: 1rem; }
+.section-title { font-size: .95rem; font-weight: 700; margin-bottom: .6rem; }
+.item-row { display: flex; justify-content: space-between; align-items: center; padding: .55rem 0; border-bottom: 1px solid var(--border-light); }
+.item-row:last-child { border-bottom: none; }
+.item-row a { font-size: .88rem; }
+.item-row .detail { font-size: .78rem; color: var(--text-muted); white-space: nowrap; }
+.empty { color: var(--text-faint); font-style: italic; font-size: .85rem; }
+{% endblock %}
+
+{% block body %}
+<div class="container" style="max-width:620px;">
+  <div class="card mb-2">
+    <h1 class="greeting">Hello, {{ user.username }}</h1>
+    <div style="margin:.35rem 0;">
+      <span class="rank-badge">{{ get_rank_name(user.rank) }}</span>
+    </div>
+    {% if titles %}
+    <div style="margin:.3rem 0 .5rem;">
+      {% for t in titles %}<span class="title-badge">{{ t.text }}</span>{% endfor %}
+    </div>
+    {% endif %}
+    {% if user.bio %}
+    <p class="bio">{{ user.bio }}</p>
+    {% endif %}
+    <p class="meta">Member since {{ user.created_at.strftime('%B %d, %Y') }}</p>
+
+    <div class="stat-grid">
+      <div class="stat-box"><div class="num">{{ books|length }}</div><div class="label">Books</div></div>
+      <div class="stat-box"><div class="num">{{ total_views }}</div><div class="label">Book Views</div></div>
+      <div class="stat-box"><div class="num">{{ s_count }}</div><div class="label">Suggestions</div></div>
+      <div class="stat-box"><div class="num">{{ s_up }} / {{ s_down }}</div><div class="label">Up / Down</div></div>
+      <div class="stat-box"><div class="num">{{ s_approved }}</div><div class="label">Approved</div></div>
+    </div>
+  </div>
+
+  <div class="card mb-2">
+    <div class="flex justify-between items-center mb-1">
+      <h2 class="section-title" style="margin-bottom:0;">Your Books</h2>
+      <a href="/corners/library/write" class="btn btn-primary" style="font-size:.8rem; padding:.4rem .8rem;">Write New</a>
+    </div>
+    {% if books %}
+    <div>
+      {% for book in books %}
+      <div class="item-row">
+        <a href="/corners/library/{{ book.id }}">{{ book.title }}</a>
+        <span class="detail">{{ book.views }} views &middot; {{ book.created_at.strftime('%b %d') }}</span>
+      </div>
+      {% endfor %}
+    </div>
+    {% else %}
+    <p class="empty">You haven't published any books yet.</p>
+    {% endif %}
+  </div>
+
+  <div class="card mb-2">
+    <div class="flex justify-between items-center mb-1">
+      <h2 class="section-title" style="margin-bottom:0;">Your Suggestions</h2>
+      <a href="/corners/suggestions/write" class="btn btn-primary" style="font-size:.8rem; padding:.4rem .8rem;">New</a>
+    </div>
+    {% if suggestions %}
+    <div>
+      {% for s in suggestions %}
+      <div class="item-row">
+        <a href="/corners/suggestions/{{ s.id }}">{{ s.title }}</a>
+        <span class="detail">{{ 'Approved' if s.is_approved else 'Open' }} &middot; {{ s.created_at.strftime('%b %d') }}</span>
+      </div>
+      {% endfor %}
+    </div>
+    {% else %}
+    <p class="empty">You haven't submitted any suggestions yet.</p>
+    {% endif %}
+  </div>
+
+  {% if corner_stats %}
+  {% for cs in corner_stats %}
+  <div class="card mb-2">
+    <h2 class="section-title">{{ cs.corner.icon }} {{ cs.corner.name }}</h2>
+    <div class="stat-grid mb-1">
+      <div class="stat-box"><div class="num">{{ cs.count }}</div><div class="label">Posts</div></div>
+      {% if cs.corner.template_type == "library" %}
+      <div class="stat-box"><div class="num">{{ cs.views }}</div><div class="label">Views</div></div>
+      {% else %}
+      <div class="stat-box"><div class="num">{{ cs.up }} / {{ cs.down }}</div><div class="label">Up / Down</div></div>
+      <div class="stat-box"><div class="num">{{ cs.approved }}</div><div class="label">Approved</div></div>
+      {% endif %}
+    </div>
+  </div>
+  {% endfor %}
+  {% endif %}
+</div>
+{% endblock %}

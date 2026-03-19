@@ -1,0 +1,37 @@
+{% extends "base.html" %}
+{% block title %}{{ corner.name }} — InnerCircle{% endblock %}
+
+{% block extra_css %}
+.header-row { display: flex; align-items: center; justify-content: space-between; margin-bottom: 1rem; flex-wrap: wrap; gap: .5rem; }
+.header-row h2 { font-size: 1.3rem; }
+.post-card { background: var(--bg-card); border-radius: 10px; box-shadow: var(--shadow); padding: 1rem 1.25rem; margin-bottom: .6rem; transition: background .2s; }
+.post-card h3 { font-size: .95rem; margin-bottom: .2rem; }
+.post-card h3 a { color: var(--text); }
+.post-card h3 a:hover { color: var(--primary); }
+.post-meta { font-size: .75rem; color: var(--text-muted); }
+.empty { color: var(--text-faint); font-style: italic; text-align: center; padding: 2rem 0; }
+{% endblock %}
+
+{% block body %}
+<div class="container">
+  <div class="header-row">
+    <h2>{{ corner.icon }} {{ corner.name }}</h2>
+    <a href="/corners/{{ corner.slug }}/write" class="btn btn-primary">New Post</a>
+  </div>
+
+  {% if posts %}
+    {% for p in posts %}
+    <div class="post-card">
+      <h3><a href="/corners/{{ corner.slug }}/{{ p.id }}">{{ p.title }}</a></h3>
+      <div class="post-meta">
+        by {{ authors[p.author_id].username if p.author_id in authors else 'Unknown' }}
+        &middot; {{ p.views }} view{{ 's' if p.views != 1 else '' }}
+        &middot; {{ p.created_at.strftime('%b %d, %Y') }}
+      </div>
+    </div>
+    {% endfor %}
+  {% else %}
+  <p class="empty">No posts yet. Be the first to create one.</p>
+  {% endif %}
+</div>
+{% endblock %}

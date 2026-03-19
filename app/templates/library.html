@@ -1,0 +1,41 @@
+{% extends "base.html" %}
+{% block title %}Library — InnerCircle{% endblock %}
+
+{% block extra_css %}
+.header-row { display: flex; align-items: center; justify-content: space-between; margin-bottom: 1.25rem; }
+.header-row h2 { font-size: 1.3rem; }
+.book-list { display: flex; flex-direction: column; gap: .75rem; }
+.book-card { background: var(--bg-card); border-radius: 10px; box-shadow: var(--shadow); padding: 1.25rem; transition: background .2s; display: block; color: var(--text); text-decoration: none; }
+.book-card:hover { text-decoration: none; background: var(--bg-hover); }
+.book-card h3 { font-size: 1rem; margin-bottom: .25rem; }
+.book-meta { font-size: .78rem; color: var(--text-muted); display: flex; gap: 1rem; flex-wrap: wrap; }
+.book-snippet { font-size: .83rem; color: var(--text-muted); margin-top: .4rem; line-height: 1.4; }
+.empty { color: var(--text-faint); font-style: italic; text-align: center; padding: 2rem 0; }
+{% endblock %}
+
+{% block body %}
+<div class="container">
+  <div class="header-row">
+    <h2>Library</h2>
+    <a href="/corners/library/write" class="btn btn-primary">Write a Book</a>
+  </div>
+
+  {% if books %}
+  <div class="book-list">
+    {% for book in books %}
+    <a href="/corners/library/{{ book.id }}" class="book-card">
+      <h3>{{ book.title }}</h3>
+      <div class="book-meta">
+        <span>by {{ authors[book.author_id].username if book.author_id in authors else 'Unknown' }}</span>
+        <span>{{ book.views }} view{{ 's' if book.views != 1 else '' }}</span>
+        <span>{{ book.created_at.strftime('%b %d, %Y') }}</span>
+      </div>
+      <p class="book-snippet">{{ book.content[:120] }}{{ '...' if book.content|length > 120 else '' }}</p>
+    </a>
+    {% endfor %}
+  </div>
+  {% else %}
+  <p class="empty">No books published yet. Be the first to write one.</p>
+  {% endif %}
+</div>
+{% endblock %}

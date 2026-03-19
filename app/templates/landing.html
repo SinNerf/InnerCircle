@@ -1,0 +1,35 @@
+{% extends "base.html" %}
+{% block title %}InnerCircle{% endblock %}
+
+{% block nav %}
+<nav>
+  <span class="brand" style="cursor:default;">InnerCircle</span>
+  <button class="theme-btn" onclick="toggleTheme()" title="Toggle theme"><span id="ti"></span></button>
+</nav>
+{% endblock %}
+
+{% block extra_css %}
+.hero { text-align: center; max-width: 480px; margin: 0 auto; padding: 6rem 1rem 4rem; }
+.logo { width: 68px; height: 68px; border-radius: 50%; background: linear-gradient(135deg, var(--primary), #7c3aed); margin: 0 auto 1.25rem; display: flex; align-items: center; justify-content: center; font-size: 1.8rem; font-weight: 700; color: #fff; box-shadow: 0 0 36px var(--primary-faint); }
+.hero h1 { font-size: 2.1rem; font-weight: 700; letter-spacing: -.02em; margin-bottom: .4rem; }
+.hero h1 span { color: var(--primary); }
+.tagline { color: var(--text-muted); font-size: 1rem; line-height: 1.6; margin-bottom: 2rem; }
+.hero-btns { display: flex; gap: .65rem; justify-content: center; }
+.hero-btns .btn { padding: .7rem 1.6rem; font-size: .92rem; }
+.btn-secondary { background: var(--primary-faint); color: var(--primary); }
+.btn-secondary:hover { opacity: .85; }
+.footer { text-align: center; color: var(--text-faint); font-size: .72rem; padding-bottom: 2rem; }
+{% endblock %}
+
+{% block body %}
+<div class="hero">
+  <div class="logo">IC</div>
+  <h1>Inner<span>Circle</span></h1>
+  <p class="tagline">A private, invite-style community. Register and an admin will review your request before you get access. Built for small groups that value trust.</p>
+  <div class="hero-btns">
+    <a href="/register" class="btn btn-primary">Register</a>
+    <a href="/login" class="btn btn-secondary">Log In</a>
+  </div>
+</div>
+<p class="footer">Admin-approved access only.</p>
+{% endblock %}

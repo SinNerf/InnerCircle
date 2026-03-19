@@ -1,0 +1,20 @@
+{% extends "base.html" %}
+{% block title %}New Post — {{ corner.name }} — InnerCircle{% endblock %}
+
+{% block body %}
+<div class="container" style="max-width:600px;">
+  <div class="card">
+    <h2 style="font-size:1.3rem; margin-bottom:1rem;">{{ corner.icon }} New {{ corner.name }} Post</h2>
+    {% if error %}
+    <div class="alert-error">{{ error }}</div>
+    {% endif %}
+    <form method="post" action="/corners/{{ corner.slug }}/write">
+      <label for="title">Title</label>
+      <input id="title" name="title" type="text" required maxlength="200" placeholder="Post title">
+      <label for="content">Content</label>
+      <textarea id="content" name="content" required placeholder="Write your post..."></textarea>
+      <button class="btn btn-primary btn-block mt-1" type="submit">Publish</button>
+    </form>
+  </div>
+</div>
+{% endblock %}

@@ -1,0 +1,38 @@
+{% extends "base.html" %}
+{% block title %}Login — InnerCircle{% endblock %}
+
+{% block nav %}
+<nav>
+  <a href="/" class="brand">InnerCircle</a>
+  <button class="theme-btn" onclick="toggleTheme()" title="Toggle theme"><span id="ti"></span></button>
+</nav>
+{% endblock %}
+
+{% block extra_css %}
+.form-wrap { max-width: 400px; margin: 3rem auto; padding: 0 1rem; }
+{% endblock %}
+
+{% block body %}
+<div class="form-wrap">
+  <div class="card">
+    <h1 style="font-size:1.35rem; margin-bottom:.15rem;">Welcome Back</h1>
+    <p class="text-muted text-sm mb-2">Log in to InnerCircle.</p>
+
+    {% if error %}
+    <div class="alert-error">{{ error }}</div>
+    {% endif %}
+
+    <form method="post" action="/login">
+      <label for="username">Username</label>
+      <input id="username" name="username" type="text" required autocomplete="username" placeholder="Your username">
+
+      <label for="password">Password</label>
+      <input id="password" name="password" type="password" required autocomplete="current-password" placeholder="Your password">
+
+      <button class="btn btn-primary btn-block" type="submit">Log In</button>
+    </form>
+
+    <p class="text-center text-sm mt-2">Don't have an account? <a href="/register">Register</a></p>
+  </div>
+</div>
+{% endblock %}

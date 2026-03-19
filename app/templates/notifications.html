@@ -1,0 +1,34 @@
+{% extends "base.html" %}
+{% block title %}Notifications — InnerCircle{% endblock %}
+
+{% block extra_css %}
+.notif-item { background: var(--bg-card); border-radius: 8px; box-shadow: var(--shadow); padding: .85rem 1rem; margin-bottom: .5rem; display: flex; justify-content: space-between; align-items: center; gap: .75rem; }
+.notif-item.unread { border-left: 3px solid var(--primary); }
+.notif-msg { font-size: .88rem; flex: 1; line-height: 1.4; }
+.notif-date { font-size: .72rem; color: var(--text-faint); white-space: nowrap; }
+.empty { color: var(--text-faint); font-style: italic; font-size: .85rem; text-align: center; padding: 2rem 0; }
+{% endblock %}
+
+{% block body %}
+<div class="container" style="max-width:600px;">
+  <div class="flex justify-between items-center mb-2">
+    <h2 style="font-size:1.3rem;">Notifications</h2>
+    {% if notifications %}
+    <form method="post" action="/notifications/read" style="margin:0;">
+      <button class="btn btn-ghost btn-sm" type="submit">Mark all read</button>
+    </form>
+    {% endif %}
+  </div>
+
+  {% if notifications %}
+    {% for n in notifications %}
+    <div class="notif-item {{ 'unread' if not n.is_read else '' }}">
+      <div class="notif-msg">{{ n.message }}</div>
+      <div class="notif-date">{{ n.created_at.strftime('%b %d, %Y') }}</div>
+    </div>
+    {% endfor %}
+  {% else %}
+  <p class="empty">No notifications yet.</p>
+  {% endif %}
+</div>
+{% endblock %}

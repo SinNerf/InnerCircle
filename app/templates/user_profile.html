@@ -1,0 +1,151 @@
+{% extends "base.html" %}
+{% block title %}{{ profile.username }} — InnerCircle{% endblock %}
+
+{% block extra_css %}
+.profile-header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: .5rem; flex-wrap: wrap; gap: .75rem; }
+.profile-header h1 { font-size: 1.4rem; }
+.badges { display: flex; gap: .4rem; flex-wrap: wrap; margin-top: .25rem; }
+.badge { font-size: .7rem; padding: .2rem .5rem; border-radius: 4px; font-weight: 600; }
+.badge-admin { background: var(--primary-faint); color: var(--primary); }
+.badge-banned { background: var(--danger-bg); color: var(--danger); }
+.profile-bio { color: var(--text-muted); font-size: .9rem; line-height: 1.5; margin-bottom: .5rem; }
+.profile-meta { font-size: .78rem; color: var(--text-faint); margin-bottom: 1rem; }
+.titles-row { margin-bottom: .75rem; }
+.item-row { display: flex; justify-content: space-between; align-items: center; padding: .6rem 0; border-bottom: 1px solid var(--border-light); }
+.item-row:last-child { border-bottom: none; }
+.item-row a { font-size: .88rem; }
+.item-row .detail { font-size: .78rem; color: var(--text-muted); }
+.section-label { font-size: .95rem; font-weight: 700; margin-bottom: .5rem; margin-top: 1.25rem; }
+.admin-forms { margin-top: 1.5rem; padding-top: 1rem; border-top: 1px solid var(--border); }
+.admin-forms h3 { font-size: .88rem; margin-bottom: .5rem; }
+.mini-form { display: flex; gap: .35rem; align-items: center; margin-bottom: .5rem; flex-wrap: wrap; }
+.mini-form input, .mini-form select, .mini-form textarea { margin-bottom: 0; font-size: .82rem; padding: .35rem .5rem; }
+{% endblock %}
+
+{% block body %}
+<div class="container" style="max-width:620px;">
+  <div class="card">
+    <div class="profile-header">
+      <div>
+        <h1>{{ profile.username }}</h1>
+        <div class="badges">
+          <span class="rank-badge">{{ get_rank_name(profile.rank) }}</span>
+          {% if profile.is_banned %}<span class="badge badge-banned">Banned</span>{% endif %}
+        </div>
+      </div>
+      {% if has_privilege(user, "admin") and profile.rank < user.rank %}
+        {% if profile.is_banned %}
+        <form method="post" action="/admin/unban/{{ profile.id }}" style="margin:0;">
+          <button class="btn btn-ghost btn-sm" type="submit">Unban</button>
+        </form>
+        {% else %}
+        <form method="post" action="/admin/ban/{{ profile.id }}" style="margin:0;">
+          <button class="btn btn-danger btn-sm" type="submit" onclick="return confirm('Ban this user?')">Ban</button>
+        </form>
+        {% endif %}
+      {% endif %}
+    </div>
+
+    {% if titles %}
+    <div class="titles-row">
+      {% for t in titles %}<span class="title-badge">{{ t.text }}</span>{% endfor %}
+    </div>
+    {% endif %}
+
+    {% if profile.bio %}
+    <p class="profile-bio">{{ profile.bio }}</p>
+    {% else %}
+    <p class="profile-bio" style="font-style:italic;">No bio provided.</p>
+    {% endif %}
+
+    <p class="profile-meta">Member since {{ profile.created_at.strftime('%B %d, %Y') }}</p>
+
+    <div class="stat-grid mb-2">
+      <div class="stat-box"><div class="num">{{ books|length }}</div><div class="label">Books</div></div>
+      <div class="stat-box"><div class="num">{{ total_views }}</div><div class="label">Book Views</div></div>
+      <div class="stat-box"><div class="num">{{ s_count }}</div><div class="label">Suggestions</div></div>
+      <div class="stat-box"><div class="num">{{ s_up }}</div><div class="label">Upvotes</div></div>
+      <div class="stat-box"><div class="num">{{ s_down }}</div><div class="label">Downvotes</div></div>
+      <div class="stat-box"><div class="num">{{ s_approved }}</div><div class="label">Approved</div></div>
+    </div>
+
+    {% if books %}
+    <h3 class="section-label">Published Books</h3>
+    <div>
+      {% for book in books %}
+      <div class="item-row">
+        <a href="/corners/library/{{ book.id }}">{{ book.title }}</a>
+        <span class="detail">{{ book.views }} views</span>
+      </div>
+      {% endfor %}
+    </div>
+    {% endif %}
+
+    {% if suggestions %}
+    <h3 class="section-label">Suggestions</h3>
+    <div>
+      {% for s in suggestions %}
+      <div class="item-row">
+        <a href="/corners/suggestions/{{ s.id }}">{{ s.title }}</a>
+        <span class="detail">{{ 'Approved' if s.is_approved else 'Open' }}</span>
+      </div>
+      {% endfor %}
+    </div>
+    {% endif %}
+
+    {% if corner_stats %}
+    {% for cs in corner_stats %}
+    <h3 class="section-label">{{ cs.corner.icon }} {{ cs.corner.name }}</h3>
+    <div class="stat-grid mb-1">
+      <div class="stat-box"><div class="num">{{ cs.count }}</div><div class="label">Posts</div></div>
+      {% if cs.corner.template_type == "library" %}
+      <div class="stat-box"><div class="num">{{ cs.views }}</div><div class="label">Views</div></div>
+      {% else %}
+      <div class="stat-box"><div class="num">{{ cs.up }}</div><div class="label">Upvotes</div></div>
+      <div class="stat-box"><div class="num">{{ cs.down }}</div><div class="label">Downvotes</div></div>
+      <div class="stat-box"><div class="num">{{ cs.approved }}</div><div class="label">Approved</div></div>
+      {% endif %}
+    </div>
+    {% endfor %}
+    {% endif %}
+
+    {% if not books and not suggestions and not corner_stats %}
+    <p class="text-muted text-sm" style="font-style:italic;">No activity yet.</p>
+    {% endif %}
+
+    {# --- Admin actions on this profile --- #}
+    {% if has_privilege(user, "admin") and profile.id != user.id %}
+    <div class="admin-forms">
+      <h3>Admin Tools</h3>
+
+      <div class="mini-form">
+        <form method="post" action="/admin/title/{{ profile.id }}" style="display:flex; gap:.35rem; align-items:center; margin:0;">
+          <input type="text" name="text" placeholder="Add title..." maxlength="100" required style="width:160px;">
+          <button class="btn btn-ghost btn-sm" type="submit">Add Title</button>
+        </form>
+      </div>
+
+      <div class="mini-form">
+        <form method="post" action="/admin/rank/{{ profile.id }}" style="display:flex; gap:.35rem; align-items:center; margin:0;">
+          <select name="rank" style="width:150px;">
+            {% for lvl, name in RANKS.items() %}
+              {% if lvl <= user.rank %}
+              <option value="{{ lvl }}" {{ 'selected' if lvl == profile.rank else '' }}>{{ lvl }}. {{ name }}</option>
+              {% endif %}
+            {% endfor %}
+          </select>
+          <button class="btn btn-ghost btn-sm" type="submit">Set Rank</button>
+        </form>
+      </div>
+
+      <div class="mini-form">
+        <form method="post" action="/admin/notify/{{ profile.id }}" style="display:flex; gap:.35rem; align-items:center; margin:0; flex-wrap:wrap;">
+          <input type="text" name="message" placeholder="Send news..." maxlength="500" required style="flex:1; min-width:160px;">
+          <button class="btn btn-ghost btn-sm" type="submit">Send</button>
+        </form>
+      </div>
+    </div>
+    {% endif %}
+  </div>
+</div>
+{% endblock %}

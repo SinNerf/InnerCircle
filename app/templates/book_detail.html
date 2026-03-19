@@ -1,0 +1,38 @@
+{% extends "base.html" %}
+{% block title %}{{ book.title }} — InnerCircle{% endblock %}
+
+{% block extra_css %}
+.book-header { margin-bottom: 1.5rem; }
+.book-header h1 { font-size: 1.5rem; margin-bottom: .4rem; }
+.book-header .meta { font-size: .82rem; color: var(--text-muted); display: flex; gap: 1rem; flex-wrap: wrap; align-items: center; }
+.book-body { line-height: 1.7; font-size: .92rem; white-space: pre-wrap; word-wrap: break-word; }
+.book-footer { margin-top: 2rem; padding-top: 1rem; border-top: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; }
+{% endblock %}
+
+{% block body %}
+<div class="container" style="max-width:680px;">
+  <div class="card">
+    <div class="book-header">
+      <h1>{{ book.title }}</h1>
+      <div class="meta">
+        <span>by <a href="/user/{{ author.username }}">{{ author.username }}</a></span>
+        <span>{{ book.views }} view{{ 's' if book.views != 1 else '' }}</span>
+        <span>{{ book.created_at.strftime('%B %d, %Y') }}</span>
+      </div>
+    </div>
+    <div class="book-body">{{ book.content }}</div>
+    <div class="book-footer">
+      <a href="/corners/library" class="btn btn-ghost">Back to Library</a>
+      {% if has_privilege(user, "admin") %}
+      <form method="post" action="/corners/library/{{ book.id }}/delete" style="margin:0;">
+        <button class="btn btn-danger btn-sm" type="submit" onclick="return confirm('Delete this book?')">Delete</button>
+      </form>
+      {% endif %}
+    </div>
+
+    {% set target_type = "book" %}
+    {% set target_id = book.id %}
+    {% include "_comments.html" %}
+  </div>
+</div>
+{% endblock %}

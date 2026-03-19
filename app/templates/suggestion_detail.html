@@ -1,0 +1,65 @@
+{% extends "base.html" %}
+{% block title %}{{ s.title }} — InnerCircle{% endblock %}
+
+{% block extra_css %}
+.vote-bar { display: flex; align-items: center; gap: .6rem; margin-bottom: 1.25rem; }
+.vote-btn { width: 38px; height: 38px; border-radius: 7px; border: 1px solid var(--border); background: var(--bg); color: var(--text-faint); font-size: 1rem; cursor: pointer; display: flex; align-items: center; justify-content: center; transition: all .15s; }
+.vote-btn:hover { border-color: var(--primary); }
+.vote-btn.active-up { background: var(--primary-faint); color: var(--primary); border-color: var(--primary); }
+.vote-btn.active-down { background: var(--danger-bg); color: var(--danger); border-color: var(--danger); }
+.vote-score { font-size: 1.3rem; font-weight: 700; color: var(--primary); min-width: 36px; text-align: center; }
+.s-header h1 { font-size: 1.4rem; margin-bottom: .3rem; }
+.s-header .meta { font-size: .82rem; color: var(--text-muted); margin-bottom: 1rem; }
+.s-content { line-height: 1.7; font-size: .92rem; white-space: pre-wrap; word-wrap: break-word; }
+.s-footer { margin-top: 2rem; padding-top: 1rem; border-top: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: .5rem; }
+{% endblock %}
+
+{% block body %}
+<div class="container" style="max-width:680px;">
+  <div class="card">
+    <div class="s-header">
+      <h1>{{ s.title }}</h1>
+      <div class="meta">
+        by <a href="/user/{{ author.username }}">{{ author.username }}</a>
+        &middot; {{ s.created_at.strftime('%B %d, %Y') }}
+        {% if s.is_approved %}&middot; <span style="color:var(--success); font-weight:600;">Approved</span>{% endif %}
+      </div>
+    </div>
+
+    <div class="vote-bar">
+      <form method="post" action="/corners/suggestions/{{ s.id }}/vote" style="margin:0;">
+        <input type="hidden" name="value" value="1">
+        <button class="vote-btn {{ 'active-up' if my_vote == 1 else '' }}" type="submit" title="Upvote">&#9650;</button>
+      </form>
+      <span class="vote-score">{{ up - down }}</span>
+      <form method="post" action="/corners/suggestions/{{ s.id }}/vote" style="margin:0;">
+        <input type="hidden" name="value" value="-1">
+        <button class="vote-btn {{ 'active-down' if my_vote == -1 else '' }}" type="submit" title="Downvote">&#9660;</button>
+      </form>
+      <span class="text-sm text-muted" style="margin-left:.5rem;">{{ up }} up &middot; {{ down }} down</span>
+    </div>
+
+    <div class="s-content">{{ s.body }}</div>
+
+    <div class="s-footer">
+      <a href="/corners/suggestions" class="btn btn-ghost">Back to Suggestions</a>
+      <div class="flex gap-1">
+        {% if has_privilege(user, "admin") and not s.is_approved %}
+        <form method="post" action="/admin/suggestion/approve/{{ s.id }}" style="margin:0;">
+          <button class="btn btn-primary btn-sm" type="submit">Approve</button>
+        </form>
+        {% endif %}
+        {% if has_privilege(user, "admin") %}
+        <form method="post" action="/corners/suggestions/{{ s.id }}/delete" style="margin:0;">
+          <button class="btn btn-danger btn-sm" type="submit" onclick="return confirm('Delete?')">Delete</button>
+        </form>
+        {% endif %}
+      </div>
+    </div>
+
+    {% set target_type = "suggestion" %}
+    {% set target_id = s.id %}
+    {% include "_comments.html" %}
+  </div>
+</div>
+{% endblock %}

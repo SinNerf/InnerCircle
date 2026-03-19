@@ -1,0 +1,32 @@
+{% extends "base.html" %}
+{% block title %}Write a Book — InnerCircle{% endblock %}
+
+{% block extra_css %}
+textarea.content-area { min-height: 280px; }
+{% endblock %}
+
+{% block body %}
+<div class="container" style="max-width:620px;">
+  <div class="card">
+    <h2 style="font-size:1.2rem; margin-bottom:1rem;">Write a Book</h2>
+
+    {% if error %}
+    <div class="alert-error">{{ error }}</div>
+    {% endif %}
+
+    <form method="post" action="/corners/library/write">
+      <label for="title">Title</label>
+      <input id="title" name="title" type="text" required maxlength="200" placeholder="Give your book a title">
+
+      <label for="content">Content</label>
+      <textarea id="content" name="content" class="content-area" required placeholder="Share your knowledge..."></textarea>
+
+      <div class="flex gap-1 mt-1">
+        <button class="btn btn-primary btn-block" type="submit">Publish</button>
+      </div>
+    </form>
+
+    <p class="text-muted text-sm text-center mt-2">Your name will appear as the author.</p>
+  </div>
+</div>
+{% endblock %}
