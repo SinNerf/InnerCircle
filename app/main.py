@@ -847,6 +847,14 @@ def notifications_mark_read(user: User = Depends(get_current_user), session: Ses
     return RedirectResponse(url="/notifications", status_code=status.HTTP_303_SEE_OTHER)
 
 
+@app.post("/notifications/clear")
+def notifications_clear(user: User = Depends(get_current_user), session: Session = Depends(get_session)):
+    for n in session.exec(select(Notification).where(Notification.user_id == user.id)).all():
+        session.delete(n)
+    session.commit()
+    return RedirectResponse(url="/notifications", status_code=status.HTTP_303_SEE_OTHER)
+
+
 @app.get("/admin", response_class=HTMLResponse)
 def admin_panel(
     request: Request, queued: int = Query(0),
