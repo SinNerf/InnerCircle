@@ -31,14 +31,24 @@
     @media (min-width: 1200px) { html { font-size: 112%; } }
     @media (min-width: 1600px) { html { font-size: 120%; } }
 
-    nav { background: var(--bg-card); border-bottom: 1px solid var(--border); padding: .7rem 1.5rem; display: flex; align-items: center; gap: 1.25rem; transition: background .2s, border .2s; }
+    nav { background: var(--bg-card); border-bottom: 1px solid var(--border); padding: .7rem 1.5rem; display: flex; align-items: center; gap: 1.25rem; transition: background .2s, border .2s; position: relative; }
     nav .brand { font-weight: 700; font-size: 1.1rem; color: var(--primary); text-decoration: none; margin-right: auto; }
     nav a { font-size: .85rem; }
+    .nav-toggle { display: none; background: none; border: none; cursor: pointer; padding: .5rem; flex-direction: column; gap: 4px; }
+    .nav-toggle span { display: block; width: 22px; height: 2px; background: var(--text); border-radius: 2px; transition: .2s; }
+    .nav-links { display: flex; align-items: center; gap: 1.25rem; }
     .theme-btn { width: 34px; height: 34px; border-radius: 50%; border: 1px solid var(--border); background: var(--bg); color: var(--text); cursor: pointer; font-size: 1rem; display: flex; align-items: center; justify-content: center; transition: all .15s; flex-shrink: 0; }
     .theme-btn:hover { border-color: var(--primary); }
 
     .notif-link { position: relative; font-size: .95rem; text-decoration: none !important; }
     .notif-badge { position: absolute; top: -7px; right: -9px; background: var(--danger); color: #fff; font-size: .55rem; font-weight: 700; padding: .1rem .32rem; border-radius: 50%; min-width: 14px; text-align: center; line-height: 1.2; }
+
+    @media (max-width: 768px) {
+      .nav-toggle { display: flex; }
+      .nav-links { display: none; position: absolute; top: 100%; left: 0; right: 0; background: var(--bg-card); border-bottom: 1px solid var(--border); padding: .75rem 1.5rem; flex-direction: column; gap: .75rem; z-index: 100; box-shadow: var(--shadow); align-items: flex-start; }
+      .nav-links.open { display: flex; }
+      .container { margin-top: 1.25rem; }
+    }
 
     .container { max-width: 720px; margin: 2rem auto; padding: 0 1rem; }
     .card { background: var(--bg-card); border-radius: 10px; box-shadow: var(--shadow); padding: 1.75rem; transition: background .2s; }
@@ -92,7 +102,30 @@
     tr:last-child td { border-bottom: none; }
 
     .title-badge { display: inline-block; font-size: .7rem; padding: .15rem .45rem; border-radius: 4px; font-weight: 600; background: var(--primary-faint); color: var(--primary); margin-right: .3rem; margin-bottom: .2rem; }
+    .title-badge[data-created] { cursor: pointer; transition: opacity .15s; }
+    .title-badge[data-created]:hover { opacity: .75; }
     .rank-badge { display: inline-block; font-size: .68rem; padding: .15rem .5rem; border-radius: 4px; font-weight: 700; background: var(--primary); color: #fff; }
+    .user-badges { display: flex; flex-wrap: wrap; gap: .35rem; margin-bottom: .75rem; }
+    .user-badge { width: 22px; height: 22px; border-radius: 5px; background: var(--primary); display: flex; align-items: center; justify-content: center; cursor: pointer; transition: transform .15s, box-shadow .15s; position: relative; box-shadow: 0 2px 6px rgba(0,0,0,.1); }
+    .user-badge:hover { transform: scale(1.05); box-shadow: 0 4px 12px rgba(0,0,0,.18); }
+    .user-badge .badge-icon { width: 14px; height: 14px; display: flex; align-items: center; justify-content: center; color: #fff; line-height: 0; overflow: hidden; }
+    .user-badge .badge-icon svg { width: 14px; height: 14px; fill: #fff; }
+    .badge-tooltip { display: none; position: absolute; bottom: calc(100% + 8px); left: 50%; transform: translateX(-50%); background: var(--bg-card); border: 1px solid var(--border); border-radius: 8px; padding: .45rem .65rem; box-shadow: var(--shadow); z-index: 200; white-space: nowrap; font-size: .72rem; text-align: center; pointer-events: none; }
+    .badge-tooltip strong { display: block; font-size: .75rem; color: var(--text); }
+    .badge-tooltip span { color: var(--text-muted); font-size: .68rem; }
+    .user-badge:hover .badge-tooltip { display: block; animation: popIn .15s ease; }
+    .badge-toggle { display: inline-flex; align-items: center; gap: .3rem; padding: .25rem .5rem; border-radius: 6px; border: 1px solid var(--border); background: var(--bg); color: var(--text-muted); cursor: pointer; font-size: .72rem; font-weight: 600; transition: all .15s; }
+    .badge-toggle.active { background: var(--primary-faint); color: var(--primary); border-color: var(--primary); }
+    .badge-toggle:hover { border-color: var(--primary); }
+    .badge-toggle .btgl-icon { width: 14px; height: 14px; display: flex; align-items: center; justify-content: center; }
+    .badge-toggle .btgl-icon svg { width: 12px; height: 12px; }
+
+    .title-popover { position: absolute; background: var(--bg-card); border: 1px solid var(--border); border-radius: 8px; padding: .75rem 1rem; box-shadow: var(--shadow); z-index: 200; font-size: .82rem; max-width: 250px; animation: popIn .15s ease; }
+    .modal-overlay { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,.45); z-index: 300; display: flex; align-items: center; justify-content: center; animation: fadeIn .15s; }
+    .modal-box { background: var(--bg-card); border-radius: 12px; padding: 1.5rem; width: 90%; max-width: 400px; max-height: 80vh; overflow-y: auto; box-shadow: 0 8px 32px rgba(0,0,0,.2); animation: slideUp .2s ease; }
+    @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+    @keyframes slideUp { from { opacity: 0; transform: translateY(16px); } to { opacity: 1; transform: translateY(0); } }
+    @keyframes popIn { from { opacity: 0; transform: translateY(-4px); } to { opacity: 1; transform: translateY(0); } }
 
     .comment-card { background: var(--bg-hover); border-radius: 8px; padding: .85rem 1rem; margin-bottom: .5rem; }
     .comment-header { display: flex; align-items: center; gap: .5rem; margin-bottom: .35rem; flex-wrap: wrap; }
@@ -109,14 +142,19 @@
   {% block nav %}
   <nav>
     <a href="/corners" class="brand">InnerCircle</a>
-    {% if user is defined and user %}
-    <a href="/corners">Corners</a>
-    <a href="/dashboard">Dashboard</a>
-    {% if user.rank >= 11 %}<a href="/admin">Admin</a>{% endif %}
-    <a href="/notifications" class="notif-link">&#128276;{% if unread_count %}<span class="notif-badge">{{ unread_count }}</span>{% endif %}</a>
-    <a href="/logout">Log out</a>
-    {% endif %}
-    <button class="theme-btn" onclick="toggleTheme()" title="Toggle theme"><span id="ti"></span></button>
+    <button class="nav-toggle" onclick="document.querySelector('.nav-links').classList.toggle('open')" aria-label="Menu">
+      <span></span><span></span><span></span>
+    </button>
+    <div class="nav-links">
+      {% if user is defined and user %}
+      <a href="/corners">Corners</a>
+      <a href="/dashboard">Dashboard</a>
+      {% if user.rank >= 11 %}<a href="/admin">Admin</a>{% endif %}
+      <a href="/notifications" class="notif-link">&#128276;{% if unread_count %}<span class="notif-badge">{{ unread_count }}</span>{% endif %}</a>
+      <a href="/logout">Log out</a>
+      {% endif %}
+      <button class="theme-btn" onclick="toggleTheme()" title="Toggle theme"><span id="ti"></span></button>
+    </div>
   </nav>
   {% endblock %}
 
@@ -129,6 +167,24 @@
       function upd(){ document.getElementById('ti').textContent = d.classList.contains('dark') ? '\u2600' : '\u263E'; }
       window.toggleTheme = function(){ d.classList.toggle('dark'); localStorage.setItem('theme', d.classList.contains('dark') ? 'dark' : 'light'); upd(); };
       upd();
+
+      document.addEventListener('click', function(e) {
+        if (e.target.closest('.title-popover')) return;
+        var old = document.querySelector('.title-popover');
+        if (old) old.remove();
+        var badge = e.target.closest('.title-badge[data-created]');
+        if (!badge) return;
+        e.preventDefault();
+        var pop = document.createElement('div');
+        pop.className = 'title-popover';
+        pop.innerHTML = '<strong>' + badge.textContent.trim() + '</strong>'
+          + '<br><span style="font-size:.75rem;color:var(--text-muted);">Granted ' + badge.dataset.created + '</span>'
+          + '<br><span style="font-size:.75rem;color:var(--text-faint);font-style:italic;">A mark of distinction.</span>';
+        var r = badge.getBoundingClientRect();
+        pop.style.top = (r.bottom + window.scrollY + 8) + 'px';
+        pop.style.left = Math.max(8, Math.min(r.left + window.scrollX, window.innerWidth - 260)) + 'px';
+        document.body.appendChild(pop);
+      });
     })();
   </script>
 </body>

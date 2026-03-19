@@ -1,0 +1,36 @@
+{% extends "base.html" %}
+{% block title %}Edit Badge — InnerCircle{% endblock %}
+
+{% block extra_css %}
+.preview-box { width: 40px; height: 40px; border-radius: 8px; background: var(--primary); display: inline-flex; align-items: center; justify-content: center; box-shadow: 0 2px 8px rgba(0,0,0,.12); vertical-align: middle; margin-left: .5rem; }
+.preview-box svg { width: 22px; height: 22px; fill: #fff; }
+{% endblock %}
+
+{% block body %}
+<div class="container" style="max-width:620px;">
+  <div class="flex justify-between items-center" style="margin-bottom:1.25rem;">
+    <h2 style="font-size:1.3rem;">Edit Badge</h2>
+    <a href="/admin/badges" class="btn btn-ghost btn-sm">Back</a>
+  </div>
+
+  <div class="card">
+    {% if badge.icon_svg %}
+    <div style="margin-bottom:1rem;">
+      <span class="text-sm text-muted">Current icon:</span>
+      <span class="preview-box">{{ badge.icon_svg|safe }}</span>
+    </div>
+    {% endif %}
+    <form method="post" action="/admin/badges/{{ badge.id }}/edit">
+      <label>Name</label>
+      <input type="text" name="name" maxlength="100" required value="{{ badge.name }}">
+      <label>Description</label>
+      <input type="text" name="description" maxlength="300" value="{{ badge.description }}">
+      <label>SVG Icon</label>
+      <textarea name="icon_svg" style="min-height:80px; font-family:monospace; font-size:.8rem;">{{ badge.icon_svg }}</textarea>
+      <div style="margin-top:.5rem;">
+        <button class="btn btn-primary" type="submit">Save Changes</button>
+      </div>
+    </form>
+  </div>
+</div>
+{% endblock %}

@@ -1,0 +1,58 @@
+{% extends "base.html" %}
+{% block title %}Manage Badges — InnerCircle{% endblock %}
+
+{% block extra_css %}
+.badge-card { background: var(--bg-card); border-radius: 10px; box-shadow: var(--shadow); padding: 1rem 1.25rem; margin-bottom: .75rem; display: flex; align-items: center; gap: 1rem; }
+.badge-preview { width: 36px; height: 36px; border-radius: 8px; background: var(--primary); display: flex; align-items: center; justify-content: center; flex-shrink: 0; box-shadow: 0 2px 8px rgba(0,0,0,.12); }
+.badge-preview svg { width: 20px; height: 20px; fill: #fff; }
+.badge-info { flex: 1; min-width: 0; }
+.badge-info .name { font-weight: 600; font-size: .9rem; }
+.badge-info .desc { font-size: .75rem; color: var(--text-muted); margin-top: .15rem; }
+.badge-actions { display: flex; gap: .35rem; flex-shrink: 0; }
+@media (max-width: 480px) {
+  .badge-card { flex-wrap: wrap; }
+  .badge-actions { width: 100%; justify-content: flex-end; }
+}
+{% endblock %}
+
+{% block body %}
+<div class="container" style="max-width:620px;">
+  <div class="flex justify-between items-center" style="margin-bottom:1.25rem;">
+    <h2 style="font-size:1.3rem;">Manage Badges</h2>
+    <a href="/admin" class="btn btn-ghost btn-sm">Back to Admin</a>
+  </div>
+
+  <div class="card mb-2">
+    <h3 style="font-size:.95rem; font-weight:700; margin-bottom:.75rem;">Create New Badge</h3>
+    <form method="post" action="/admin/badges/create">
+      <label>Name</label>
+      <input type="text" name="name" maxlength="100" required placeholder="Badge name...">
+      <label>Description</label>
+      <input type="text" name="description" maxlength="300" placeholder="Short description...">
+      <label>SVG Icon (paste markup)</label>
+      <textarea name="icon_svg" placeholder='<svg viewBox="0 0 24 24">...</svg>' style="min-height:80px; font-family:monospace; font-size:.8rem;"></textarea>
+      <button class="btn btn-primary" type="submit">Create Badge</button>
+    </form>
+  </div>
+
+  {% if badges %}
+  {% for badge in badges %}
+  <div class="badge-card">
+    <div class="badge-preview">{{ badge.icon_svg|safe }}</div>
+    <div class="badge-info">
+      <div class="name">{{ badge.name }}</div>
+      {% if badge.description %}<div class="desc">{{ badge.description }}</div>{% endif %}
+    </div>
+    <div class="badge-actions">
+      <a href="/admin/badges/{{ badge.id }}/edit" class="btn btn-ghost btn-sm">Edit</a>
+      <form method="post" action="/admin/badges/{{ badge.id }}/delete" style="margin:0;">
+        <button class="btn btn-danger btn-sm" type="submit" onclick="return confirm('Delete this badge and remove it from all users?')">Delete</button>
+      </form>
+    </div>
+  </div>
+  {% endfor %}
+  {% else %}
+  <p class="text-muted text-sm" style="font-style:italic;">No badges created yet.</p>
+  {% endif %}
+</div>
+{% endblock %}

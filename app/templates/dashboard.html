@@ -22,7 +22,20 @@
     </div>
     {% if titles %}
     <div style="margin:.3rem 0 .5rem;">
-      {% for t in titles %}<span class="title-badge">{{ t.text }}</span>{% endfor %}
+      {% for t in titles %}<span class="title-badge" data-created="{{ t.created_at.strftime('%B %d, %Y') }}">{{ t.text }}</span>{% endfor %}
+    </div>
+    {% endif %}
+    {% if my_badges %}
+    <div class="user-badges" style="margin:.3rem 0 .5rem;">
+      {% for b in my_badges %}
+      <div class="user-badge">
+        <div class="badge-icon">{{ b.icon_svg|safe }}</div>
+        <div class="badge-tooltip">
+          <strong>{{ b.name }}</strong>
+          {% if b.description %}<span>{{ b.description }}</span>{% endif %}
+        </div>
+      </div>
+      {% endfor %}
     </div>
     {% endif %}
     {% if user.bio %}

@@ -50,6 +50,23 @@ class Title(SQLModel, table=True):
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
 
+class Badge(SQLModel, table=True):
+    id: int | None = Field(default=None, primary_key=True)
+    name: str = Field(max_length=100, unique=True)
+    description: str = Field(default="", max_length=300)
+    icon_svg: str = Field(default="")
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    updated_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+
+
+class UserBadge(SQLModel, table=True):
+    id: int | None = Field(default=None, primary_key=True)
+    user_id: int = Field(foreign_key="user.id")
+    badge_id: int = Field(foreign_key="badge.id")
+    assigned_by: int = Field(foreign_key="user.id")
+    assigned_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+
+
 class Notification(SQLModel, table=True):
     id: int | None = Field(default=None, primary_key=True)
     user_id: int = Field(foreign_key="user.id")

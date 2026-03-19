@@ -48,7 +48,27 @@
 
     {% if titles %}
     <div class="titles-row">
-      {% for t in titles %}<span class="title-badge">{{ t.text }}</span>{% endfor %}
+      {% for t in titles %}<span class="title-badge" data-created="{{ t.created_at.strftime('%B %d, %Y') }}">{{ t.text }}</span>{% endfor %}
+    </div>
+    {% endif %}
+
+    {% if profile_badges %}
+    <div class="user-badges">
+      {% for b in profile_badges %}
+      <div class="user-badge">
+        <div class="badge-icon">{{ b.icon_svg|safe }}</div>
+        <div class="badge-tooltip">
+          <strong>{{ b.name }}</strong>
+          {% if b.description %}<span>{{ b.description }}</span>{% endif %}
+        </div>
+      </div>
+      {% endfor %}
+    </div>
+    {% endif %}
+
+    {% if has_privilege(user, "admin") %}
+    <div style="margin-bottom:.75rem;">
+      <button class="btn btn-ghost btn-sm" type="button" onclick="openTitleModal()">+ Add Title</button>
     </div>
     {% endif %}
 
@@ -113,18 +133,25 @@
     <p class="text-muted text-sm" style="font-style:italic;">No activity yet.</p>
     {% endif %}
 
-    {# --- Admin actions on this profile --- #}
-    {% if has_privilege(user, "admin") and profile.id != user.id %}
+    {% if has_privilege(user, "admin") and (all_badges or profile.id != user.id) %}
     <div class="admin-forms">
-      <h3>Admin Tools</h3>
-
-      <div class="mini-form">
-        <form method="post" action="/admin/title/{{ profile.id }}" style="display:flex; gap:.35rem; align-items:center; margin:0;">
-          <input type="text" name="text" placeholder="Add title..." maxlength="100" required style="width:160px;">
-          <button class="btn btn-ghost btn-sm" type="submit">Add Title</button>
+      {% if all_badges %}
+      <h4 style="font-size:.82rem; font-weight:600; margin-bottom:.5rem; color:var(--text-muted);">Assign Badges</h4>
+      <div style="display:flex; flex-wrap:wrap; gap:.4rem; margin-bottom:1rem;">
+        {% for badge in all_badges %}
+        <form method="post" action="/admin/badge/toggle/{{ profile.id }}" style="margin:0;">
+          <input type="hidden" name="badge_id" value="{{ badge.id }}">
+          <button type="submit" class="badge-toggle {{ 'active' if badge.id in user_badge_ids else '' }}">
+            <span class="btgl-icon">{{ badge.icon_svg|safe }}</span>
+            {{ badge.name }}
+          </button>
         </form>
+        {% endfor %}
       </div>
+      {% endif %}
 
+      {% if profile.id != user.id %}
+      <h3>Admin Tools</h3>
       <div class="mini-form">
         <form method="post" action="/admin/rank/{{ profile.id }}" style="display:flex; gap:.35rem; align-items:center; margin:0;">
           <select name="rank" style="width:150px;">
@@ -137,15 +164,49 @@
           <button class="btn btn-ghost btn-sm" type="submit">Set Rank</button>
         </form>
       </div>
-
       <div class="mini-form">
         <form method="post" action="/admin/notify/{{ profile.id }}" style="display:flex; gap:.35rem; align-items:center; margin:0; flex-wrap:wrap;">
           <input type="text" name="message" placeholder="Send news..." maxlength="500" required style="flex:1; min-width:160px;">
           <button class="btn btn-ghost btn-sm" type="submit">Send</button>
         </form>
       </div>
+      {% endif %}
     </div>
     {% endif %}
   </div>
 </div>
+
+{% if has_privilege(user, "admin") %}
+<div id="titleModal" class="modal-overlay" style="display:none;" onclick="if(event.target===this)closeTitleModal()">
+  <div class="modal-box">
+    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:1rem;">
+      <h3 style="font-size:1rem; margin:0;">Add Title to {{ profile.username }}</h3>
+      <button onclick="closeTitleModal()" style="background:none; border:none; font-size:1.4rem; cursor:pointer; color:var(--text); line-height:1;">&times;</button>
+    </div>
+
+    {% if all_title_texts %}
+    <p style="font-size:.78rem; color:var(--text-muted); margin-bottom:.5rem;">Choose existing title:</p>
+    <div style="display:flex; flex-wrap:wrap; gap:.4rem; margin-bottom:1.25rem;">
+      {% for tt in all_title_texts %}
+      <form method="post" action="/admin/title/{{ profile.id }}" style="margin:0;">
+        <input type="hidden" name="text" value="{{ tt }}">
+        <button type="submit" class="title-badge" style="cursor:pointer; border:none; padding:.25rem .55rem; font-size:.78rem;">{{ tt }}</button>
+      </form>
+      {% endfor %}
+    </div>
+    {% endif %}
+
+    <p style="font-size:.78rem; color:var(--text-muted); margin-bottom:.35rem;">Or create a new title:</p>
+    <form method="post" action="/admin/title/{{ profile.id }}" style="display:flex; gap:.35rem;">
+      <input type="text" name="text" placeholder="New title..." maxlength="100" required style="flex:1; margin-bottom:0;">
+      <button class="btn btn-primary btn-sm" type="submit">Add</button>
+    </form>
+  </div>
+</div>
+<script>
+function openTitleModal(){ document.getElementById('titleModal').style.display='flex'; }
+function closeTitleModal(){ document.getElementById('titleModal').style.display='none'; }
+</script>
+{% endif %}
+
 {% endblock %}

@@ -2,14 +2,18 @@
 {% block title %}All Users — InnerCircle{% endblock %}
 
 {% block extra_css %}
-.user-row { background: var(--bg-card); border-radius: 8px; box-shadow: var(--shadow); padding: .75rem 1rem; margin-bottom: .4rem; display: flex; justify-content: space-between; align-items: center; gap: .5rem; }
-.user-row .name { font-weight: 600; font-size: .9rem; }
-.user-row .meta { font-size: .75rem; color: var(--text-muted); }
+.user-row { background: var(--bg-card); border-radius: 10px; box-shadow: var(--shadow); padding: 1rem 1.25rem; margin-bottom: .75rem; display: flex; justify-content: space-between; align-items: center; gap: .75rem; }
+.user-row .name { font-weight: 600; font-size: .95rem; margin-bottom: .25rem; }
+.user-row .meta { font-size: .75rem; color: var(--text-muted); display: flex; align-items: center; gap: .4rem; flex-wrap: wrap; }
+@media (max-width: 480px) {
+  .user-row { flex-direction: column; align-items: flex-start; gap: .5rem; }
+  .user-row .btn { align-self: flex-end; }
+}
 {% endblock %}
 
 {% block body %}
-<div class="container" style="max-width:600px;">
-  <div class="flex justify-between items-center mb-2">
+<div class="container" style="max-width:620px;">
+  <div class="flex justify-between items-center" style="margin-bottom:1.25rem;">
     <h2 style="font-size:1.3rem;">All Users ({{ users|length }})</h2>
     <a href="/admin" class="btn btn-ghost btn-sm">Back to Admin</a>
   </div>
@@ -20,8 +24,8 @@
       <div class="name"><a href="/user/{{ u.username }}">{{ u.username }}</a></div>
       <div class="meta">
         <span class="rank-badge" style="font-size:.6rem; padding:.1rem .35rem;">{{ get_rank_name(u.rank) }}</span>
-        &middot; joined {{ u.created_at.strftime('%Y-%m-%d') }}
-        {% if u.is_banned %}&middot; <span style="color:var(--danger); font-weight:600;">Banned</span>{% endif %}
+        <span>&middot; joined {{ u.created_at.strftime('%Y-%m-%d') }}</span>
+        {% if u.is_banned %}<span>&middot; <span style="color:var(--danger); font-weight:600;">Banned</span></span>{% endif %}
       </div>
     </div>
     <a href="/user/{{ u.username }}" class="btn btn-ghost btn-sm">Profile</a>

@@ -18,8 +18,8 @@ from app.auth import (
     verify_password,
 )
 from app.models import (
-    AdminAction, Book, Comment, Corner, Notification, Post, PostVote,
-    Suggestion, Title, User, Vote, create_db_and_tables, engine, get_session,
+    AdminAction, Badge, Book, Comment, Corner, Notification, Post, PostVote,
+    Suggestion, Title, User, UserBadge, Vote, create_db_and_tables, engine, get_session,
 )
 from app.ranks import RANKS, get_rank_name, has_privilege
 
@@ -203,6 +203,22 @@ def _exec_add_title(session, p):
     session.add(Title(user_id=p["user_id"], text=p["text"]))
 
 
+def _exec_assign_badge(session, p):
+    existing = session.exec(select(UserBadge).where(
+        UserBadge.user_id == p["user_id"], UserBadge.badge_id == p["badge_id"]
+    )).first()
+    if not existing:
+        session.add(UserBadge(user_id=p["user_id"], badge_id=p["badge_id"], assigned_by=p["assigned_by"]))
+
+
+def _exec_remove_badge(session, p):
+    existing = session.exec(select(UserBadge).where(
+        UserBadge.user_id == p["user_id"], UserBadge.badge_id == p["badge_id"]
+    )).first()
+    if existing:
+        session.delete(existing)
+
+
 def _exec_set_rank(session, p):
     u = session.get(User, p["user_id"])
     if u:
@@ -257,6 +273,7 @@ ACTION_DISPATCH = {
     "send_notification": _exec_send_notification, "delete_comment": _exec_delete_comment,
     "create_corner": _exec_create_corner,
     "delete_post": _exec_delete_post, "approve_post": _exec_approve_post,
+    "assign_badge": _exec_assign_badge, "remove_badge": _exec_remove_badge,
 }
 
 
@@ -276,6 +293,8 @@ def _action_summary(action_type: str, payload: dict) -> str:
         "create_corner": lambda p: f"Create corner \"{p.get('name')}\"",
         "delete_post": lambda p: f"Delete post #{p.get('post_id')}",
         "approve_post": lambda p: f"Approve post #{p.get('post_id')}",
+        "assign_badge": lambda p: f"Assign badge #{p.get('badge_id')} \u2192 user #{p.get('user_id')}",
+        "remove_badge": lambda p: f"Remove badge #{p.get('badge_id')} from user #{p.get('user_id')}",
     }
     return fns.get(action_type, lambda p: action_type)(payload)
 
@@ -755,9 +774,21 @@ def user_profile(username: str, request: Request, user: User = Depends(get_curre
     ss = _suggestion_stats(session, profile.id)
     titles = session.exec(select(Title).where(Title.user_id == profile.id).order_by(Title.created_at)).all()
     cstats = _corner_stats(session, profile.id)
+    all_title_texts = sorted(set(t.text for t in session.exec(select(Title)).all()))
+    all_badges = session.exec(select(Badge).order_by(Badge.name)).all()
+    ub_rows = session.exec(select(UserBadge).where(UserBadge.user_id == profile.id)).all()
+    profile_badges = []
+    user_badge_ids = set()
+    for ub in ub_rows:
+        b = session.get(Badge, ub.badge_id)
+        if b:
+            profile_badges.append(b)
+            user_badge_ids.add(b.id)
     return _tpl("user_profile.html", request, session, user,
                 profile=profile, books=books, total_views=total_views, titles=titles,
-                corner_stats=cstats, **ss)
+                corner_stats=cstats, all_title_texts=all_title_texts,
+                all_badges=all_badges, profile_badges=profile_badges,
+                user_badge_ids=user_badge_ids, **ss)
 
 
 @app.get("/dashboard", response_class=HTMLResponse)
@@ -767,9 +798,15 @@ def dashboard(request: Request, user: User = Depends(get_current_user), session:
     ss = _suggestion_stats(session, user.id)
     titles = session.exec(select(Title).where(Title.user_id == user.id).order_by(Title.created_at)).all()
     cstats = _corner_stats(session, user.id)
+    ub_rows = session.exec(select(UserBadge).where(UserBadge.user_id == user.id)).all()
+    my_badges = []
+    for ub in ub_rows:
+        b = session.get(Badge, ub.badge_id)
+        if b:
+            my_badges.append(b)
     return _tpl("dashboard.html", request, session, user,
                 books=books, total_views=total_views, titles=titles,
-                corner_stats=cstats, **ss)
+                corner_stats=cstats, my_badges=my_badges, **ss)
 
 
 @app.get("/notifications", response_class=HTMLResponse)
@@ -944,6 +981,101 @@ def reject_action(action_id: int, architect: User = Depends(get_current_architec
     session.add(action)
     session.commit()
     return RedirectResponse(url="/admin", status_code=status.HTTP_303_SEE_OTHER)
+
+
+@app.get("/admin/badges", response_class=HTMLResponse)
+def admin_badges_page(request: Request, admin: User = Depends(get_current_admin), session: Session = Depends(get_session)):
+    badges = session.exec(select(Badge).order_by(Badge.created_at)).all()
+    return _tpl("admin_badges.html", request, session, admin, badges=badges)
+
+
+@app.post("/admin/badges/create")
+def create_badge(
+    name: str = Form(..., min_length=1, max_length=100),
+    description: str = Form("", max_length=300),
+    icon_svg: str = Form(""),
+    admin: User = Depends(get_current_admin), session: Session = Depends(get_session),
+):
+    badge = Badge(name=name.strip(), description=description.strip(), icon_svg=icon_svg.strip())
+    session.add(badge)
+    session.commit()
+    return RedirectResponse(url="/admin/badges", status_code=status.HTTP_303_SEE_OTHER)
+
+
+@app.get("/admin/badges/{badge_id}/edit", response_class=HTMLResponse)
+def edit_badge_page(badge_id: int, request: Request, admin: User = Depends(get_current_admin), session: Session = Depends(get_session)):
+    badge = session.get(Badge, badge_id)
+    if not badge:
+        raise HTTPException(status_code=404)
+    return _tpl("badge_edit.html", request, session, admin, badge=badge)
+
+
+@app.post("/admin/badges/{badge_id}/edit")
+def edit_badge(
+    badge_id: int,
+    name: str = Form(..., min_length=1, max_length=100),
+    description: str = Form("", max_length=300),
+    icon_svg: str = Form(""),
+    admin: User = Depends(get_current_admin), session: Session = Depends(get_session),
+):
+    badge = session.get(Badge, badge_id)
+    if not badge:
+        raise HTTPException(status_code=404)
+    badge.name = name.strip()
+    badge.description = description.strip()
+    badge.icon_svg = icon_svg.strip()
+    badge.updated_at = datetime.now(timezone.utc)
+    session.add(badge)
+    session.commit()
+    return RedirectResponse(url="/admin/badges", status_code=status.HTTP_303_SEE_OTHER)
+
+
+@app.post("/admin/badges/{badge_id}/delete")
+def delete_badge(badge_id: int, admin: User = Depends(get_current_admin), session: Session = Depends(get_session)):
+    badge = session.get(Badge, badge_id)
+    if not badge:
+        raise HTTPException(status_code=404)
+    for ub in session.exec(select(UserBadge).where(UserBadge.badge_id == badge_id)).all():
+        session.delete(ub)
+    session.delete(badge)
+    session.commit()
+    return RedirectResponse(url="/admin/badges", status_code=status.HTTP_303_SEE_OTHER)
+
+
+@app.post("/admin/badge/toggle/{user_id}")
+def toggle_badge(
+    user_id: int, badge_id: int = Form(...),
+    admin: User = Depends(get_current_admin), session: Session = Depends(get_session),
+):
+    u = session.get(User, user_id)
+    if not u:
+        raise HTTPException(status_code=404)
+    if not session.get(Badge, badge_id):
+        raise HTTPException(status_code=404)
+    existing = session.exec(
+        select(UserBadge).where(UserBadge.user_id == user_id, UserBadge.badge_id == badge_id)
+    ).first()
+    if existing:
+        return do_or_queue(admin, "remove_badge", {"user_id": user_id, "badge_id": badge_id},
+                           session, _exec_remove_badge, f"/user/{u.username}")
+    return do_or_queue(admin, "assign_badge",
+                       {"user_id": user_id, "badge_id": badge_id, "assigned_by": admin.id},
+                       session, _exec_assign_badge, f"/user/{u.username}")
+
+
+@app.get("/api/users/{user_id}/badges")
+def api_user_badges(user_id: int, session: Session = Depends(get_session)):
+    u = session.get(User, user_id)
+    if not u:
+        raise HTTPException(status_code=404)
+    rows = session.exec(select(UserBadge).where(UserBadge.user_id == user_id)).all()
+    result = []
+    for ub in rows:
+        badge = session.get(Badge, ub.badge_id)
+        if badge:
+            result.append({"id": badge.id, "name": badge.name, "description": badge.description,
+                           "assigned_at": ub.assigned_at.isoformat()})
+    return result
 
 
 @app.post("/api/login")

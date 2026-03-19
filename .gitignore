@@ -1,9 +1,14 @@
 .env
 *.db
+*.sqlite3
 __pycache__/
+*.pyc
 .venv/
+venv/
 dist/
 build/
 *.spec
 cloudflared-config.yml
-
+.DS_Store
+Thumbs.db
+.pytest_cache/
