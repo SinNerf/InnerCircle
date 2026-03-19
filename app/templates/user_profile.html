@@ -48,7 +48,9 @@
 
     {% if titles %}
     <div class="titles-row">
-      {% for t in titles %}<span class="title-badge" data-created="{{ t.created_at.strftime('%B %d, %Y') }}">{{ t.text }}</span>{% endfor %}
+      {% for t in titles %}
+      <span class="title-badge" data-created="{{ t.created_at.strftime('%B %d, %Y') }}" data-desc="{{ t.description }}">{{ t.text }}</span>{% if has_privilege(user, "admin") %}<form method="post" action="/admin/title/{{ t.id }}/delete" style="display:inline;margin:0;"><button type="submit" style="background:none;border:none;color:var(--danger);cursor:pointer;font-size:.6rem;padding:0;margin-left:-.1rem;margin-right:.25rem;vertical-align:middle;" onclick="return confirm('Remove this title?')">&times;</button></form>{% endif %}
+      {% endfor %}
     </div>
     {% endif %}
 
@@ -184,21 +186,23 @@
       <button onclick="closeTitleModal()" style="background:none; border:none; font-size:1.4rem; cursor:pointer; color:var(--text); line-height:1;">&times;</button>
     </div>
 
-    {% if all_title_texts %}
+    {% if all_saved_titles %}
     <p style="font-size:.78rem; color:var(--text-muted); margin-bottom:.5rem;">Choose existing title:</p>
     <div style="display:flex; flex-wrap:wrap; gap:.4rem; margin-bottom:1.25rem;">
-      {% for tt in all_title_texts %}
+      {% for st in all_saved_titles %}
       <form method="post" action="/admin/title/{{ profile.id }}" style="margin:0;">
-        <input type="hidden" name="text" value="{{ tt }}">
-        <button type="submit" class="title-badge" style="cursor:pointer; border:none; padding:.25rem .55rem; font-size:.78rem;">{{ tt }}</button>
+        <input type="hidden" name="text" value="{{ st.text }}">
+        <input type="hidden" name="description" value="{{ st.description }}">
+        <button type="submit" class="title-badge" style="cursor:pointer; border:none; padding:.25rem .55rem; font-size:.78rem;" title="{{ st.description or 'No description' }}">{{ st.text }}</button>
       </form>
       {% endfor %}
     </div>
     {% endif %}
 
     <p style="font-size:.78rem; color:var(--text-muted); margin-bottom:.35rem;">Or create a new title:</p>
-    <form method="post" action="/admin/title/{{ profile.id }}" style="display:flex; gap:.35rem;">
-      <input type="text" name="text" placeholder="New title..." maxlength="100" required style="flex:1; margin-bottom:0;">
+    <form method="post" action="/admin/title/{{ profile.id }}">
+      <input type="text" name="text" placeholder="Title name..." maxlength="100" required style="margin-bottom:.4rem;">
+      <input type="text" name="description" placeholder="Description (shown when clicked)..." maxlength="300" style="margin-bottom:.5rem;">
       <button class="btn btn-primary btn-sm" type="submit">Add</button>
     </form>
   </div>

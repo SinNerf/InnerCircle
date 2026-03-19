@@ -47,6 +47,7 @@ class Title(SQLModel, table=True):
     id: int | None = Field(default=None, primary_key=True)
     user_id: int = Field(foreign_key="user.id")
     text: str = Field(max_length=100)
+    description: str = Field(default="", max_length=300)
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
 

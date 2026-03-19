@@ -177,9 +177,10 @@
         e.preventDefault();
         var pop = document.createElement('div');
         pop.className = 'title-popover';
+        var desc = badge.dataset.desc;
         pop.innerHTML = '<strong>' + badge.textContent.trim() + '</strong>'
           + '<br><span style="font-size:.75rem;color:var(--text-muted);">Granted ' + badge.dataset.created + '</span>'
-          + '<br><span style="font-size:.75rem;color:var(--text-faint);font-style:italic;">A mark of distinction.</span>';
+          + (desc ? '<br><span style="font-size:.75rem;color:var(--text-faint);font-style:italic;">' + desc + '</span>' : '');
         var r = badge.getBoundingClientRect();
         pop.style.top = (r.bottom + window.scrollY + 8) + 'px';
         pop.style.left = Math.max(8, Math.min(r.left + window.scrollX, window.innerWidth - 260)) + 'px';

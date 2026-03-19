@@ -43,6 +43,13 @@ BUILTIN_CORNERS = [
 @asynccontextmanager
 async def lifespan(_app: FastAPI):
     create_db_and_tables()
+    from sqlalchemy import text as sa_text
+    with engine.connect() as conn:
+        try:
+            conn.execute(sa_text("ALTER TABLE title ADD COLUMN description VARCHAR(300) DEFAULT ''"))
+            conn.commit()
+        except Exception:
+            pass
     with Session(engine) as s:
         for c in BUILTIN_CORNERS:
             if not s.exec(select(Corner).where(Corner.slug == c["slug"])).first():
@@ -200,7 +207,13 @@ def _exec_delete_suggestion(session, p):
 
 
 def _exec_add_title(session, p):
-    session.add(Title(user_id=p["user_id"], text=p["text"]))
+    session.add(Title(user_id=p["user_id"], text=p["text"], description=p.get("description", "")))
+
+
+def _exec_remove_title(session, p):
+    t = session.get(Title, p["title_id"])
+    if t:
+        session.delete(t)
 
 
 def _exec_assign_badge(session, p):
@@ -269,7 +282,7 @@ ACTION_DISPATCH = {
     "ban_user": _exec_ban_user, "unban_user": _exec_unban_user,
     "approve_suggestion": _exec_approve_suggestion,
     "delete_book": _exec_delete_book, "delete_suggestion": _exec_delete_suggestion,
-    "add_title": _exec_add_title, "set_rank": _exec_set_rank,
+    "add_title": _exec_add_title, "remove_title": _exec_remove_title, "set_rank": _exec_set_rank,
     "send_notification": _exec_send_notification, "delete_comment": _exec_delete_comment,
     "create_corner": _exec_create_corner,
     "delete_post": _exec_delete_post, "approve_post": _exec_approve_post,
@@ -287,6 +300,7 @@ def _action_summary(action_type: str, payload: dict) -> str:
         "delete_book": lambda p: f"Delete book #{p.get('book_id')}",
         "delete_suggestion": lambda p: f"Delete suggestion #{p.get('suggestion_id')}",
         "add_title": lambda p: f"Title \"{p.get('text')}\" \u2192 user #{p.get('user_id')}",
+        "remove_title": lambda p: f"Remove title #{p.get('title_id')}",
         "set_rank": lambda p: f"Set rank {p.get('rank')} for user #{p.get('user_id')}",
         "send_notification": lambda p: f"Notify user #{p.get('user_id')}",
         "delete_comment": lambda p: f"Delete comment #{p.get('comment_id')}",
@@ -774,7 +788,12 @@ def user_profile(username: str, request: Request, user: User = Depends(get_curre
     ss = _suggestion_stats(session, profile.id)
     titles = session.exec(select(Title).where(Title.user_id == profile.id).order_by(Title.created_at)).all()
     cstats = _corner_stats(session, profile.id)
-    all_title_texts = sorted(set(t.text for t in session.exec(select(Title)).all()))
+    all_raw = session.exec(select(Title)).all()
+    seen = {}
+    for t in all_raw:
+        if t.text not in seen:
+            seen[t.text] = t.description or ""
+    all_saved_titles = [{"text": k, "description": v} for k, v in sorted(seen.items())]
     all_badges = session.exec(select(Badge).order_by(Badge.name)).all()
     ub_rows = session.exec(select(UserBadge).where(UserBadge.user_id == profile.id)).all()
     profile_badges = []
@@ -786,7 +805,7 @@ def user_profile(username: str, request: Request, user: User = Depends(get_curre
             user_badge_ids.add(b.id)
     return _tpl("user_profile.html", request, session, user,
                 profile=profile, books=books, total_views=total_views, titles=titles,
-                corner_stats=cstats, all_title_texts=all_title_texts,
+                corner_stats=cstats, all_saved_titles=all_saved_titles,
                 all_badges=all_badges, profile_badges=profile_badges,
                 user_badge_ids=user_badge_ids, **ss)
 
@@ -908,11 +927,21 @@ def unban_user(user_id: int, admin: User = Depends(get_current_admin), session: 
 
 
 @app.post("/admin/title/{user_id}")
-def add_title(user_id: int, text: str = Form(..., min_length=1, max_length=100), admin: User = Depends(get_current_admin), session: Session = Depends(get_session)):
+def add_title(user_id: int, text: str = Form(..., min_length=1, max_length=100), description: str = Form("", max_length=300), admin: User = Depends(get_current_admin), session: Session = Depends(get_session)):
     u = session.get(User, user_id)
     if not u:
         raise HTTPException(status_code=404)
-    return do_or_queue(admin, "add_title", {"user_id": user_id, "text": text.strip()}, session, _exec_add_title, f"/user/{u.username}")
+    return do_or_queue(admin, "add_title", {"user_id": user_id, "text": text.strip(), "description": description.strip()}, session, _exec_add_title, f"/user/{u.username}")
+
+
+@app.post("/admin/title/{title_id}/delete")
+def delete_title(title_id: int, admin: User = Depends(get_current_admin), session: Session = Depends(get_session)):
+    t = session.get(Title, title_id)
+    if not t:
+        raise HTTPException(status_code=404)
+    u = session.get(User, t.user_id)
+    redirect = f"/user/{u.username}" if u else "/admin"
+    return do_or_queue(admin, "remove_title", {"title_id": title_id}, session, _exec_remove_title, redirect)
 
 
 @app.post("/admin/rank/{user_id}")
