@@ -1661,8 +1661,19 @@ def update_profile_bio(
         raise HTTPException(status_code=404)
     if profile.id != user.id and not has_privilege(user, "admin"):
         raise HTTPException(status_code=403, detail="Not allowed")
-    profile.bio = (bio or "").strip()[:500]
+    old_bio = profile.bio or ""
+    new_bio = (bio or "").strip()[:500]
+    profile.bio = new_bio
     session.add(profile)
+    if user.id != profile.id:
+        _log_privilege_use(
+            session,
+            user,
+            "admin" if has_privilege(user, "admin") else "comment",
+            "update_user_bio",
+            location=f"/user/{profile.username}",
+            details=f"actor={user.username}; target={profile.username}; old={old_bio}; new={new_bio}",
+        )
     session.commit()
     return RedirectResponse(url=f"/user/{profile.username}", status_code=status.HTTP_303_SEE_OTHER)
 
@@ -1752,7 +1763,31 @@ def user_logs(username: str, request: Request, user: User = Depends(get_current_
         profile=profile,
         logs=readable_logs,
         can_see_details=is_admin,
+        can_clear_logs=has_privilege(user, "architect"),
     )
+
+
+@app.post("/user/{username}/logs/clear")
+def clear_user_logs(
+    username: str,
+    architect: User = Depends(get_current_architect),
+    session: Session = Depends(get_session),
+):
+    profile = session.exec(select(User).where(User.username == username)).first()
+    if not profile:
+        raise HTTPException(status_code=404)
+    for row in session.exec(select(PrivilegeLog).where(PrivilegeLog.actor_id == profile.id)).all():
+        session.delete(row)
+    _log_privilege_use(
+        session,
+        architect,
+        "architect",
+        "clear_user_logs",
+        location=f"/user/{profile.username}/logs",
+        details=f"cleared_actor={profile.username}",
+    )
+    session.commit()
+    return RedirectResponse(url=f"/user/{profile.username}/logs", status_code=status.HTTP_303_SEE_OTHER)
 
 
 @app.get("/dashboard", response_class=HTMLResponse)
@@ -2002,7 +2037,7 @@ def set_rank(user_id: int, rank: int = Form(...), admin: User = Depends(get_curr
     return do_or_queue(admin, "set_rank", {"user_id": user_id, "rank": rank}, session, _exec_set_rank, f"/user/{u.username}")
 
 
-@app.post("/admin/notify/{user_id}")
+@app.post("/admin/notify/user/{user_id}")
 def send_notification(user_id: int, message: str = Form(..., min_length=1, max_length=500), admin: User = Depends(get_current_admin), session: Session = Depends(get_session)):
     u = session.get(User, user_id)
     if not u:

@@ -329,7 +329,7 @@
 
       <h3>Admin Tools</h3>
       <div class="mini-form">
-        <form method="post" action="/admin/notify/{{ profile.id }}" style="display:flex; gap:.35rem; align-items:center; margin:0; flex-wrap:wrap;">
+        <form method="post" action="/admin/notify/user/{{ profile.id }}" style="display:flex; gap:.35rem; align-items:center; margin:0; flex-wrap:wrap;">
           <input type="text" name="message" placeholder="Send news..." maxlength="500" required style="flex:1; min-width:160px;">
           <button class="btn btn-ghost btn-sm" type="submit">Send</button>
         </form>

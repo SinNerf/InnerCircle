@@ -12,7 +12,14 @@
 <div class="container" style="max-width:760px;">
   <div class="flex justify-between items-center" style="margin-bottom:1rem;">
     <h2 style="font-size:1.2rem;">{{ profile.username }} Privilege Log</h2>
-    <a href="/user/{{ profile.username }}" class="btn btn-ghost btn-sm">Back to Profile</a>
+    <div style="display:flex; gap:.5rem; align-items:center; flex-wrap:wrap;">
+      {% if can_clear_logs %}
+      <form method="post" action="/user/{{ profile.username }}/logs/clear" style="margin:0;">
+        <button class="btn btn-danger btn-sm" type="submit" onclick="return confirm('Clear all logs for this user? This cannot be undone.')">Clear Logs</button>
+      </form>
+      {% endif %}
+      <a href="/user/{{ profile.username }}" class="btn btn-ghost btn-sm">Back to Profile</a>
+    </div>
   </div>
 
   {% if logs %}
