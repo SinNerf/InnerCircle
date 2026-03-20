@@ -24,6 +24,10 @@
 .add-corner-form input, .add-corner-form select { margin-bottom: 0; }
 .add-corner-form .inline-group { display: flex; gap: .5rem; }
 .add-corner-form .inline-group > * { flex: 1; min-width: 0; }
+.broadcast-form { background: var(--bg-card); border-radius: 10px; box-shadow: var(--shadow); padding: .85rem 1rem; margin-bottom: 1rem; }
+.broadcast-form .line { display:flex; gap:.5rem; align-items:center; flex-wrap:wrap; }
+.broadcast-form input[type="text"] { margin:0; flex:1; min-width:220px; }
+.broadcast-form select, .broadcast-form input[type="number"] { margin:0; width:auto; min-width:110px; }
 {% endblock %}
 
 {% block body %}
@@ -36,6 +40,21 @@
     <a href="/admin/users" class="btn btn-ghost">All Users</a>
     <a href="/admin/badges" class="btn btn-ghost">Manage Badges</a>
     <a href="/admin/tags" class="btn btn-ghost">Manage Tags</a>
+  </div>
+
+  <div class="broadcast-form">
+    <div style="font-weight:600; font-size:.9rem; margin-bottom:.5rem;">Send Notification</div>
+    <form method="post" action="/admin/notify/broadcast" class="line">
+      <input type="text" name="message" maxlength="500" required placeholder="Message to users...">
+      <select name="target" id="notify-target" onchange="document.getElementById('notify-rank-wrap').style.display = this.value === 'rank' ? 'block' : 'none';">
+        <option value="all">All users</option>
+        <option value="rank">Specific rank</option>
+      </select>
+      <span id="notify-rank-wrap" style="display:none;">
+        <input type="number" name="rank" min="1" max="12" value="1">
+      </span>
+      <button class="btn btn-primary btn-sm" type="submit">Send</button>
+    </form>
   </div>
 
   {% if user.rank >= 12 and pending_actions %}
@@ -148,13 +167,14 @@
         <span class="c-icon">{{ c.icon }}</span>
         <div class="c-info">
           <div class="c-name">{{ c.name }}</div>
-          <div class="c-meta">/corners/{{ c.slug }} &middot; {{ c.template_type }}-style{% if c.is_external %} &middot; External ({{ external_counts[c.id] if c.id in external_counts else 0 }} users){% endif %}</div>
+          <div class="c-meta">/corners/{{ c.slug }} &middot; {{ c.template_type }}-style{% if c.is_external %} &middot; External ({{ external_counts[c.id] if c.id in external_counts else 0 }} users){% endif %}{% if c.is_hidden %} &middot; Hidden{% endif %}</div>
         </div>
-        {% if c.slug != 'library' and c.slug != 'suggestions' %}
-          <form method="post" action="/admin/corner/{{ c.id }}/delete" style="margin:0;">
-            <button class="btn btn-danger btn-sm" type="submit" onclick="return confirm('Delete this corner permanently?')">Delete</button>
-          </form>
-        {% endif %}
+        <form method="post" action="/admin/corner/{{ c.id }}/toggle-hidden" style="margin:0;">
+          <button class="btn btn-ghost btn-sm" type="submit">{{ 'Unhide' if c.is_hidden else 'Hide' }}</button>
+        </form>
+        <form method="post" action="/admin/corner/{{ c.id }}/delete" style="margin:0;">
+          <button class="btn btn-danger btn-sm" type="submit" onclick="return confirm('Delete this corner permanently?')">Delete</button>
+        </form>
       </div>
       {% endfor %}
     </div>

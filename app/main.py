@@ -68,6 +68,11 @@ async def lifespan(_app: FastAPI):
         except Exception:
             pass
         try:
+            conn.execute(sa_text("ALTER TABLE corner ADD COLUMN is_hidden BOOLEAN DEFAULT 0"))
+            conn.commit()
+        except Exception:
+            pass
+        try:
             conn.execute(sa_text("ALTER TABLE user ADD COLUMN is_deleted BOOLEAN DEFAULT 0"))
             conn.commit()
         except Exception:
@@ -663,8 +668,14 @@ def corners(
     request: Request, q: str | None = Query(default=None),
     user: User = Depends(get_current_user), session: Session = Depends(get_session),
 ):
-    channels = session.exec(select(Corner).order_by(Corner.created_at)).all()
-    externals = session.exec(select(Corner).where(Corner.is_external == True).order_by(Corner.created_at)).all()
+    if has_privilege(user, "admin"):
+        channels = session.exec(select(Corner).order_by(Corner.created_at)).all()
+        externals = session.exec(select(Corner).where(Corner.is_external == True).order_by(Corner.created_at)).all()
+    else:
+        channels = session.exec(select(Corner).where(Corner.is_hidden == False).order_by(Corner.created_at)).all()
+        externals = session.exec(
+            select(Corner).where(Corner.is_external == True, Corner.is_hidden == False).order_by(Corner.created_at)
+        ).all()
     saved_external_ids = {
         sub.corner_id for sub in session.exec(
             select(UserCornerSubscription).where(UserCornerSubscription.user_id == user.id)
@@ -723,6 +734,8 @@ def library(
 ):
     books = session.exec(select(Book).order_by(Book.created_at.desc())).all()
     library_corner = session.exec(select(Corner).where(Corner.slug == "library")).first()
+    if library_corner and library_corner.is_hidden and not has_privilege(user, "admin"):
+        raise HTTPException(status_code=404)
     available_tags = _available_tags_for_corner(session, library_corner.id if library_corner else None)
     can_view_18plus = _user_can_view_18plus(session, user)
     book_ids = [b.id for b in books if b.id is not None]
@@ -877,9 +890,11 @@ def suggestions_list(
     request: Request, sort: str = Query("new"), tab: str = Query("open"), tag: str | None = Query(default=None),
     user: User = Depends(get_current_user), session: Session = Depends(get_session),
 ):
+    suggestion_corner = session.exec(select(Corner).where(Corner.slug == "suggestions")).first()
+    if suggestion_corner and suggestion_corner.is_hidden and not has_privilege(user, "admin"):
+        raise HTTPException(status_code=404)
     is_approved = tab == "approved"
     items = session.exec(select(Suggestion).where(Suggestion.is_approved == is_approved)).all()
-    suggestion_corner = session.exec(select(Corner).where(Corner.slug == "suggestions")).first()
     available_tags = _available_tags_for_corner(session, suggestion_corner.id if suggestion_corner else None)
     can_view_18plus = _user_can_view_18plus(session, user)
     suggestion_ids = [s.id for s in items if s.id is not None]
@@ -1051,6 +1066,8 @@ def generic_corner_list(
 ):
     corner = session.exec(select(Corner).where(Corner.slug == slug)).first()
     if not corner:
+        raise HTTPException(status_code=404)
+    if corner.is_hidden and not has_privilege(user, "admin"):
         raise HTTPException(status_code=404)
 
     if corner.template_type == "suggestions":
@@ -1760,6 +1777,32 @@ def send_notification(user_id: int, message: str = Form(..., min_length=1, max_l
     return RedirectResponse(url=f"/user/{u.username}", status_code=status.HTTP_303_SEE_OTHER)
 
 
+@app.post("/admin/notify/broadcast")
+def send_notification_broadcast(
+    message: str = Form(..., min_length=1, max_length=500),
+    target: str = Form("all"),
+    rank: int = Form(1),
+    admin: User = Depends(get_current_admin),
+    session: Session = Depends(get_session),
+):
+    clean = message.strip()
+    recipients = session.exec(select(User).where(User.is_active == True, User.is_deleted == False)).all()
+    if target == "rank":
+        recipients = [u for u in recipients if u.rank == rank]
+    for recipient in recipients:
+        session.add(Notification(user_id=recipient.id, message=clean))
+    _log_privilege_use(
+        session,
+        admin,
+        "admin",
+        "broadcast_notification",
+        location="/admin",
+        details=f"target={target}; rank={rank if target == 'rank' else '-'}; recipients={len(recipients)}; message={clean}",
+    )
+    session.commit()
+    return RedirectResponse(url="/admin", status_code=status.HTTP_303_SEE_OTHER)
+
+
 @app.post("/admin/corner")
 def create_corner(
     name: str = Form(..., min_length=1, max_length=100),
@@ -1801,8 +1844,6 @@ def delete_corner(
     corner = session.get(Corner, corner_id)
     if not corner:
         raise HTTPException(status_code=404)
-    if corner.slug in RESERVED_SLUGS:
-        raise HTTPException(status_code=400, detail="Cannot delete a reserved corner")
     _log_privilege_use(
         session,
         admin,
@@ -1812,6 +1853,29 @@ def delete_corner(
         details=f"corner={corner.name}; slug={corner.slug}",
     )
     _exec_delete_corner(session, {"corner_id": corner_id})
+    session.commit()
+    return RedirectResponse(url="/admin", status_code=status.HTTP_303_SEE_OTHER)
+
+
+@app.post("/admin/corner/{corner_id}/toggle-hidden")
+def toggle_corner_hidden(
+    corner_id: int,
+    admin: User = Depends(get_current_admin),
+    session: Session = Depends(get_session),
+):
+    corner = session.get(Corner, corner_id)
+    if not corner:
+        raise HTTPException(status_code=404)
+    corner.is_hidden = not corner.is_hidden
+    session.add(corner)
+    _log_privilege_use(
+        session,
+        admin,
+        "admin",
+        "toggle_corner_hidden",
+        location="/admin",
+        details=f"corner={corner.name}; slug={corner.slug}; hidden={corner.is_hidden}",
+    )
     session.commit()
     return RedirectResponse(url="/admin", status_code=status.HTTP_303_SEE_OTHER)
 

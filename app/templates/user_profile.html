@@ -27,8 +27,8 @@
 .settings-btn:hover { border-color: var(--primary); background: var(--primary-faint); }
 .settings-actions { display: flex; flex-direction: column; gap: .55rem; }
 .reason-modal-form textarea { margin-bottom: .65rem; min-height: 100px; }
-.follow-cta { margin: .85rem 0 .5rem; }
-.follow-cta .btn { width: 100%; max-width: 260px; border-radius: 10px; padding: .55rem 1rem; font-size: .88rem; }
+.follow-cta { margin: .75rem 0 0; }
+.follow-cta .btn { width: 100%; max-width: 220px; border-radius: 9px; padding: .42rem .85rem; font-size: .82rem; }
 .modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,.55); display: none; align-items: center; justify-content: center; z-index: 40; padding: 1rem; }
 .modal-box { width: min(100%, 560px); max-height: 85vh; overflow: auto; background: var(--bg-card); border-radius: 12px; box-shadow: var(--shadow); padding: 1rem; }
 @media (max-width: 640px) {
@@ -185,20 +185,6 @@
     </div>
     {% endif %}
 
-    {% if profile.id != user.id %}
-    <div class="follow-cta">
-      {% if is_following %}
-        <form method="post" action="/user/unfollow/{{ profile.id }}" style="margin:0;">
-          <button class="btn btn-ghost" type="submit">Following - Tap to Unfollow</button>
-        </form>
-      {% else %}
-        <form method="post" action="/user/follow/{{ profile.id }}" style="margin:0;">
-          <button class="btn btn-primary" type="submit">Follow {{ profile.username }}</button>
-        </form>
-      {% endif %}
-    </div>
-    {% endif %}
-
     {% if has_privilege(user, "admin") %}
     <div style="margin-bottom:.75rem;">
       <button class="btn btn-ghost btn-sm" type="button" onclick="openTitleModal()">+ Add Title</button>
@@ -211,7 +197,7 @@
     <p class="profile-bio" style="font-style:italic;">No bio provided.</p>
     {% endif %}
 
-    <p class="profile-meta">Member since {{ profile.created_at.strftime('%B %d, %Y') }} &middot; {{ followers_count }} followers &middot; {{ following_count }} following</p>
+    <p class="profile-meta">Member since {{ profile.created_at.strftime('%B %d, %Y') }}</p>
 
     <div class="stat-grid mb-2">
       <div class="stat-box"><div class="num">{{ books|length }}</div><div class="label">Books</div></div>
@@ -220,6 +206,8 @@
       <div class="stat-box"><div class="num">{{ s_up }}</div><div class="label">Upvotes</div></div>
       <div class="stat-box"><div class="num">{{ s_down }}</div><div class="label">Downvotes</div></div>
       <div class="stat-box"><div class="num">{{ s_approved }}</div><div class="label">Approved</div></div>
+      <div class="stat-box"><div class="num">{{ followers_count }}</div><div class="label">Followers</div></div>
+      <div class="stat-box"><div class="num">{{ following_count }}</div><div class="label">Following</div></div>
     </div>
 
     {% if books %}
@@ -269,6 +257,20 @@
     {% if profile_has_privileges %}
     <div class="profile-log-cta">
       <a href="/user/{{ profile.username }}/logs" class="btn btn-ghost">Privilege Activity Log</a>
+    </div>
+    {% endif %}
+
+    {% if profile.id != user.id %}
+    <div class="follow-cta">
+      {% if is_following %}
+        <form method="post" action="/user/unfollow/{{ profile.id }}" style="margin:0;">
+          <button class="btn btn-ghost" type="submit">Following</button>
+        </form>
+      {% else %}
+        <form method="post" action="/user/follow/{{ profile.id }}" style="margin:0;">
+          <button class="btn btn-primary" type="submit">Follow {{ profile.username }}</button>
+        </form>
+      {% endif %}
     </div>
     {% endif %}
 

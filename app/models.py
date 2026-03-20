@@ -139,6 +139,7 @@ class Corner(SQLModel, table=True):
     description: str = Field(default="", max_length=300)
     template_type: str = Field(default="library", max_length=20)
     is_external: bool = Field(default=False)
+    is_hidden: bool = Field(default=False)
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
 
