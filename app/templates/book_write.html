@@ -20,6 +20,30 @@ textarea.content-area { min-height: 280px; }
 
       <label for="content">Content</label>
       <textarea id="content" name="content" class="content-area" required placeholder="Share your knowledge..."></textarea>
+      <p class="text-muted text-sm" style="margin-top:.35rem;">Use <code>---page---</code> on a new line to split the book into pages.</p>
+
+      {% if tags %}
+      <div style="margin-top:1rem;">
+        <label style="margin-bottom:.35rem;">Tags</label>
+        <div style="display:flex; flex-wrap:wrap; gap:.5rem; margin-bottom:1rem;">
+          {% for t in tags %}
+            {% set can_select_illegal = has_privilege(user, 'admin') or user.rank >= t.min_rank %}
+            {% set can_select_18plus = has_privilege(user, 'admin') or can_view_18plus %}
+            {% if (t.tag_type == 'illegal' and not can_select_illegal) or (t.tag_type == '18plus' and not can_select_18plus) %}
+              <label style="opacity:.55; display:flex; align-items:center; gap:.4rem; font-size:.85rem;">
+                <input type="checkbox" disabled>
+                {{ t.name }}
+              </label>
+            {% else %}
+              <label style="display:flex; align-items:center; gap:.4rem; font-size:.85rem;">
+                <input type="checkbox" name="tag_ids" value="{{ t.id }}">
+                {{ t.name }}
+              </label>
+            {% endif %}
+          {% endfor %}
+        </div>
+      </div>
+      {% endif %}
 
       <div class="flex gap-1 mt-1">
         <button class="btn btn-primary btn-block" type="submit">Publish</button>

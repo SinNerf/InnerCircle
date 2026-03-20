@@ -20,7 +20,10 @@
     <div class="s-header">
       <h1>{{ s.title }}</h1>
       <div class="meta">
-        by <a href="/user/{{ author.username }}">{{ author.username }}</a>
+        by
+        <a href="/user/{{ author.username }}">
+          {{ author.username }}{% if author.is_deleted %} Deleted{% endif %}
+        </a>
         &middot; {{ s.created_at.strftime('%B %d, %Y') }}
         {% if s.is_approved %}&middot; <span style="color:var(--success); font-weight:600;">Approved</span>{% endif %}
       </div>
@@ -41,8 +44,54 @@
 
     <div class="s-content">{{ s.body }}</div>
 
+    {% if s_tags and s_tags|length > 0 %}
+    <div style="margin:.85rem 0;">
+      <div style="font-size:.8rem; font-weight:700; color:var(--text-muted); margin-bottom:.35rem;">Tags</div>
+      <div style="display:flex; flex-wrap:wrap; gap:.45rem;">
+        {% for t in s_tags %}
+          {% if t.tag_type == 'illegal' %}
+            <span class="title-badge" style="background:var(--danger-bg); color:var(--danger); border:1px solid var(--danger-border);">{{ t.name }}</span>
+          {% elif t.tag_type == '18plus' %}
+            <span class="title-badge" style="background:rgba(79,70,229,.12); color:var(--primary); border:1px solid rgba(79,70,229,.2);">{{ t.name }}</span>
+          {% else %}
+            <span class="title-badge">{{ t.name }}</span>
+          {% endif %}
+        {% endfor %}
+      </div>
+    </div>
+    {% endif %}
+
     <div class="s-footer">
       <a href="/corners/suggestions" class="btn btn-ghost">Back to Suggestions</a>
+
+      {% if can_edit_tags %}
+      <div style="width:100%; margin-top:.9rem;">
+        <form method="post" action="/corners/suggestions/{{ s.id }}/tags">
+          <div style="font-size:.8rem; font-weight:700; color:var(--text-muted); margin-bottom:.35rem;">Update Tags</div>
+          <div style="display:flex; flex-wrap:wrap; gap:.5rem; margin-bottom:.75rem;">
+            {% for t in all_tags %}
+              {% set can_select_illegal = has_privilege(user, 'admin') or user.rank >= t.min_rank %}
+              {% set disabled_illegal = (t.tag_type == 'illegal' and not can_select_illegal) %}
+              {% set can_select_18plus = has_privilege(user, 'admin') or can_view_18plus %}
+              {% set disabled_18plus = (t.tag_type == '18plus' and not can_select_18plus) %}
+              {% set disabled_tag = disabled_illegal or disabled_18plus %}
+              <label style="display:flex; align-items:center; gap:.4rem; opacity:{{ '0.55' if disabled_tag else '1' }};">
+                <input
+                  type="checkbox"
+                  name="tag_ids"
+                  value="{{ t.id }}"
+                  {% if t.id in s_tag_ids %}checked{% endif %}
+                  {% if disabled_tag %}disabled{% endif %}
+                >
+                {{ t.name }}
+              </label>
+            {% endfor %}
+          </div>
+          <button class="btn btn-primary btn-sm" type="submit">Save Tags</button>
+        </form>
+      </div>
+      {% endif %}
+
       <div class="flex gap-1">
         {% if has_privilege(user, "admin") and not s.is_approved %}
         <form method="post" action="/admin/suggestion/approve/{{ s.id }}" style="margin:0;">

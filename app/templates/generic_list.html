@@ -9,6 +9,9 @@
 .post-card h3 a { color: var(--text); }
 .post-card h3 a:hover { color: var(--primary); }
 .post-meta { font-size: .75rem; color: var(--text-muted); }
+.filters { display:flex; gap:.35rem; flex-wrap:wrap; margin-bottom:1rem; }
+.filter-btn { padding:.3rem .7rem; border-radius:5px; font-size:.75rem; font-weight:600; text-decoration:none; color:var(--text-muted); background:transparent; border:1px solid var(--border); }
+.filter-btn.active { background: var(--primary-faint); color: var(--primary); border-color: var(--primary); }
 .empty { color: var(--text-faint); font-style: italic; text-align: center; padding: 2rem 0; }
 {% endblock %}
 
@@ -18,13 +21,22 @@
     <h2>{{ corner.icon }} {{ corner.name }}</h2>
     <a href="/corners/{{ corner.slug }}/write" class="btn btn-primary">New Post</a>
   </div>
+  <div class="filters">
+    <a href="/corners/{{ corner.slug }}" class="filter-btn {{ 'active' if not current_tag else '' }}">All tags</a>
+    {% for t in available_tags %}
+      <a href="/corners/{{ corner.slug }}?tag={{ t.slug }}" class="filter-btn {{ 'active' if current_tag == t.slug else '' }}">{{ t.name }}</a>
+    {% endfor %}
+  </div>
 
   {% if posts %}
     {% for p in posts %}
     <div class="post-card">
       <h3><a href="/corners/{{ corner.slug }}/{{ p.id }}">{{ p.title }}</a></h3>
       <div class="post-meta">
-        by {{ authors[p.author_id].username if p.author_id in authors else 'Unknown' }}
+        by {{
+          (authors[p.author_id].username ~ (' Deleted' if authors[p.author_id].is_deleted else ''))
+          if p.author_id in authors else 'Unknown'
+        }}
         &middot; {{ p.views }} view{{ 's' if p.views != 1 else '' }}
         &middot; {{ p.created_at.strftime('%b %d, %Y') }}
       </div>

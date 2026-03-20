@@ -1,0 +1,92 @@
+{% extends "base.html" %}
+{% block title %}Manage Tags — InnerCircle{% endblock %}
+
+{% block extra_css %}
+.tag-row { background: var(--bg-card); border-radius: 10px; box-shadow: var(--shadow); padding: 1rem 1.25rem; margin-bottom: .75rem; display: flex; justify-content: space-between; align-items: center; gap: 1rem; flex-wrap: wrap; }
+.tag-row .info { flex: 1; min-width: 0; }
+.tag-name { font-weight: 700; }
+.tag-meta { font-size: .78rem; color: var(--text-muted); margin-top: .15rem; }
+.pill { display: inline-block; font-size: .68rem; padding: .15rem .45rem; border-radius: 6px; font-weight: 700; margin-right: .35rem; }
+.pill-illegal { background: rgba(185, 28, 28, .1); color: var(--danger); }
+.pill-18plus { background: rgba(79, 70, 229, .12); color: var(--primary); }
+{% endblock %}
+
+{% block body %}
+<div class="container" style="max-width:620px;">
+  <div class="flex justify-between items-center" style="margin-bottom:1.25rem;">
+    <h2 style="font-size:1.3rem;">Manage Tags</h2>
+    <a href="/admin" class="btn btn-ghost btn-sm">Back to Admin</a>
+  </div>
+
+  <div class="card mb-2">
+    <h3 style="font-size:.95rem; font-weight:700; margin-bottom:.75rem;">Create New Tag</h3>
+    <form method="post" action="/admin/tags/create">
+      <label>Name</label>
+      <input type="text" name="name" maxlength="100" required placeholder="e.g. Illegal">
+
+      <label>Slug (stable id)</label>
+      <input type="text" name="slug" maxlength="60" required placeholder="e.g. illegal">
+
+      <label>Type</label>
+      <select name="tag_type" required style="margin-bottom:.85rem;">
+        <option value="normal">Normal</option>
+        <option value="illegal">Illegal (rank-gated)</option>
+        <option value="18plus">18+ (badge-gated)</option>
+      </select>
+
+      <div style="margin-top:.5rem;">
+        <label>Min Rank for Illegal</label>
+        <input type="number" name="min_rank" min="1" max="12" value="5" style="margin-bottom:0;">
+      </div>
+
+      <div style="margin-top:1rem;">
+        <label style="margin-bottom:.35rem;">Visible in Corners</label>
+        <div style="display:flex; flex-wrap:wrap; gap:.5rem;">
+          {% for c in corners %}
+            <label style="display:flex; align-items:center; gap:.35rem; font-size:.85rem;">
+              <input type="checkbox" name="corner_ids" value="{{ c.id }}">
+              {{ c.name }}
+            </label>
+          {% endfor %}
+        </div>
+      </div>
+
+      <button class="btn btn-primary" type="submit" style="margin-top:1rem;">Create Tag</button>
+    </form>
+  </div>
+
+  {% if tags %}
+    {% for t in tags %}
+      <div class="tag-row">
+        <div class="info">
+          <div class="tag-name">
+            {% if t.tag_type == 'illegal' %}
+              <span class="pill pill-illegal">Illegal</span>
+            {% elif t.tag_type == '18plus' %}
+              <span class="pill pill-18plus">18+</span>
+            {% endif %}
+            {{ t.name }}
+          </div>
+          <div class="tag-meta">/{{ t.slug }} &middot; {{ t.tag_type }}{% if t.tag_type == 'illegal' %} &middot; min rank {{ t.min_rank }}{% endif %}</div>
+          <div class="tag-meta" style="margin-top:.25rem;">
+            {% if t.id in tag_corner_map and tag_corner_map[t.id] %}
+              corners:
+              {% for c in tag_corner_map[t.id] %}
+                {{ c.name }}{% if not loop.last %}, {% endif %}
+              {% endfor %}
+            {% else %}
+              corners: all
+            {% endif %}
+          </div>
+        </div>
+        <form method="post" action="/admin/tags/{{ t.id }}/delete" style="margin:0;">
+          <button class="btn btn-danger btn-sm" type="submit" onclick="return confirm('Delete this tag? It will be removed from all posts.')" style="white-space:nowrap;">Delete</button>
+        </form>
+      </div>
+    {% endfor %}
+  {% else %}
+    <p class="text-muted text-sm" style="font-style:italic;">No tags created yet.</p>
+  {% endif %}
+</div>
+{% endblock %}
+

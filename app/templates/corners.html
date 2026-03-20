@@ -48,5 +48,32 @@
     </a>
     {% endfor %}
   </div>
+
+  <h2 class="mb-2 mt-3" style="font-size:1.3rem;">Externals</h2>
+  {% if externals %}
+    <div style="margin-top:1rem;">
+      {% for ex in externals %}
+        <div class="result-card" style="margin-bottom:.75rem;">
+          <div class="info">
+            <h3 style="font-size:1rem; margin-bottom:.15rem;">{{ ex.icon }} {{ ex.name }}</h3>
+            <p>{{ ex.description }}</p>
+          </div>
+          <div style="display:flex; align-items:center; gap:.5rem; flex-shrink:0; flex-wrap:wrap; justify-content:flex-end;">
+            <a href="/corners/{{ ex.slug }}" class="btn btn-ghost btn-sm">Open</a>
+            <form method="post" action="/corners/external/{{ ex.slug }}/toggle" style="margin:0;">
+              <button
+                class="btn btn-sm {{ 'btn-ghost' if ex.id in saved_external_ids else 'btn-primary' }}"
+                type="submit"
+              >
+                {{ 'Remove' if ex.id in saved_external_ids else 'Add' }}
+              </button>
+            </form>
+          </div>
+        </div>
+      {% endfor %}
+    </div>
+  {% else %}
+    <p class="text-muted text-sm" style="font-style:italic;">No external channels.</p>
+  {% endif %}
 </div>
 {% endblock %}

@@ -106,5 +106,20 @@
   </div>
   {% endfor %}
   {% endif %}
+
+  {% if saved_externals %}
+  <div class="card mb-2">
+    <div class="flex justify-between items-center mb-1">
+      <h2 class="section-title" style="margin-bottom:0;">Your Externals</h2>
+    </div>
+    <div>
+      {% for ex in saved_externals %}
+      <div class="item-row">
+        <a href="/corners/{{ ex.slug }}">{{ ex.icon }} {{ ex.name }}</a>
+      </div>
+      {% endfor %}
+    </div>
+  </div>
+  {% endif %}
 </div>
 {% endblock %}

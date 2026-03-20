@@ -1,4 +1,3 @@
-{# Include this partial in detail pages. Expects: comments, can_comment, target_type, target_id, user #}
 <div style="margin-top:2rem; padding-top:1rem; border-top:1px solid var(--border);">
   <h3 style="font-size:.95rem; margin-bottom:.75rem;">Comments</h3>
 
@@ -17,7 +16,9 @@
     {% for item in comments %}
     <div class="comment-card">
       <div class="comment-header">
-        <a href="/user/{{ item.author.username }}" style="font-size:.82rem;">{{ item.author.username }}</a>
+        <a href="/user/{{ item.author.username }}" style="font-size:.82rem;">
+          {{ item.author.username }}{% if item.author.is_deleted %} Deleted{% endif %}
+        </a>
         <span class="text-faint text-sm">{{ item.c.created_at.strftime('%b %d, %Y') }}</span>
         {% if has_privilege(user, "admin") %}
         <form method="post" action="/comment/{{ item.c.id }}/delete" style="margin:0;">
@@ -30,7 +31,9 @@
       {% for reply in item.replies %}
       <div class="reply-card">
         <div class="comment-header">
-          <a href="/user/{{ reply.author.username }}" style="font-size:.78rem;">{{ reply.author.username }}</a>
+          <a href="/user/{{ reply.author.username }}" style="font-size:.78rem;">
+            {{ reply.author.username }}{% if reply.author.is_deleted %} Deleted{% endif %}
+          </a>
           <span class="text-faint" style="font-size:.72rem;">{{ reply.c.created_at.strftime('%b %d, %Y') }}</span>
           {% if has_privilege(user, "admin") %}
           <form method="post" action="/comment/{{ reply.c.id }}/delete" style="margin:0;">

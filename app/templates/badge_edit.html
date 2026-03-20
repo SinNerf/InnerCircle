@@ -27,6 +27,16 @@
       <input type="text" name="description" maxlength="300" value="{{ badge.description }}">
       <label>SVG Icon</label>
       <textarea name="icon_svg" style="min-height:80px; font-family:monospace; font-size:.8rem;">{{ badge.icon_svg }}</textarea>
+      <label style="display:flex; align-items:center; gap:.5rem; margin-top:.75rem;">
+        <input
+          type="checkbox"
+          name="can_view_18plus"
+          value="true"
+          style="width:auto; margin:0;"
+          {% if badge.can_view_18plus %}checked{% endif %}
+        >
+        Can view 18+ content
+      </label>
       <div style="margin-top:.5rem;">
         <button class="btn btn-primary" type="submit">Save Changes</button>
       </div>

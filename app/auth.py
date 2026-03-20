@@ -53,7 +53,7 @@ def get_current_user(
     if username is None:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid token payload")
     user = session.exec(select(User).where(User.username == username)).first()
-    if user is None or not user.is_active or user.is_banned:
+    if user is None or not user.is_active or user.is_banned or user.is_deleted:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="User not found or inactive")
     return user
 

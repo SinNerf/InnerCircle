@@ -32,13 +32,19 @@
   </div>
 
   <div class="tabs">
-    <a href="/corners/{{ corner.slug }}?tab=open&sort={{ sort }}" class="tab {{ 'active' if tab == 'open' else '' }}">Open</a>
-    <a href="/corners/{{ corner.slug }}?tab=approved&sort={{ sort }}" class="tab {{ 'active' if tab == 'approved' else '' }}">Approved</a>
+    <a href="/corners/{{ corner.slug }}?tab=open&sort={{ sort }}&tag={{ current_tag }}" class="tab {{ 'active' if tab == 'open' else '' }}">Open</a>
+    <a href="/corners/{{ corner.slug }}?tab=approved&sort={{ sort }}&tag={{ current_tag }}" class="tab {{ 'active' if tab == 'approved' else '' }}">Approved</a>
   </div>
 
   <div class="filters">
-    <a href="/corners/{{ corner.slug }}?tab={{ tab }}&sort=new" class="filter-btn {{ 'active' if sort == 'new' else '' }}">Newest</a>
-    <a href="/corners/{{ corner.slug }}?tab={{ tab }}&sort=top" class="filter-btn {{ 'active' if sort == 'top' else '' }}">Most Upvoted</a>
+    <a href="/corners/{{ corner.slug }}?tab={{ tab }}&sort=new&tag={{ current_tag }}" class="filter-btn {{ 'active' if sort == 'new' else '' }}">Newest</a>
+    <a href="/corners/{{ corner.slug }}?tab={{ tab }}&sort=top&tag={{ current_tag }}" class="filter-btn {{ 'active' if sort == 'top' else '' }}">Most Upvoted</a>
+  </div>
+  <div class="filters">
+    <a href="/corners/{{ corner.slug }}?tab={{ tab }}&sort={{ sort }}" class="filter-btn {{ 'active' if not current_tag else '' }}">All tags</a>
+    {% for t in available_tags %}
+      <a href="/corners/{{ corner.slug }}?tab={{ tab }}&sort={{ sort }}&tag={{ t.slug }}" class="filter-btn {{ 'active' if current_tag == t.slug else '' }}">{{ t.name }}</a>
+    {% endfor %}
   </div>
 
   {% if items %}
@@ -52,7 +58,10 @@
       <div class="s-body">
         <h3><a href="/corners/{{ corner.slug }}/{{ item.p.id }}">{{ item.p.title }}</a></h3>
         <div class="s-meta">
-          by {{ authors[item.p.author_id].username if item.p.author_id in authors else 'Unknown' }}
+          by {{
+            (authors[item.p.author_id].username ~ (' Deleted' if authors[item.p.author_id].is_deleted else ''))
+            if item.p.author_id in authors else 'Unknown'
+          }}
           &middot; {{ item.up }} up / {{ item.down }} down
           &middot; {{ item.p.created_at.strftime('%b %d, %Y') }}
           {% if item.p.is_approved %}&middot; <span style="color:var(--success);">Approved</span>{% endif %}

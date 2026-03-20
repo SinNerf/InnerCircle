@@ -1,0 +1,37 @@
+{% extends "base.html" %}
+{% block title %}{{ profile.username }} Logs — InnerCircle{% endblock %}
+
+{% block extra_css %}
+.log-row { background: var(--bg-card); border-radius: 10px; box-shadow: var(--shadow); padding: .95rem 1.1rem; margin-bottom: .65rem; }
+.log-main { font-size: .9rem; font-weight: 600; }
+.log-meta { font-size: .75rem; color: var(--text-muted); margin-top: .2rem; }
+.log-detail { font-size: .78rem; color: var(--text-muted); margin-top: .45rem; white-space: pre-wrap; word-break: break-word; }
+{% endblock %}
+
+{% block body %}
+<div class="container" style="max-width:760px;">
+  <div class="flex justify-between items-center" style="margin-bottom:1rem;">
+    <h2 style="font-size:1.2rem;">{{ profile.username }} Privilege Log</h2>
+    <a href="/user/{{ profile.username }}" class="btn btn-ghost btn-sm">Back to Profile</a>
+  </div>
+
+  {% if logs %}
+    {% for log in logs %}
+      <div class="log-row">
+        <div class="log-main">{{ log.action }}</div>
+        <div class="log-meta">
+          {{ log.privilege|upper }} &middot;
+          {{ log.created_at.strftime('%Y-%m-%d %H:%M') }}
+          {% if log.location %}&middot; {{ log.location }}{% endif %}
+        </div>
+        {% if can_see_details and log.details %}
+          <div class="log-detail">{{ log.details }}</div>
+        {% endif %}
+      </div>
+    {% endfor %}
+  {% else %}
+    <p class="text-muted text-sm" style="font-style:italic;">No privilege usage logged yet.</p>
+  {% endif %}
+</div>
+{% endblock %}
+

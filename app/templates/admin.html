@@ -35,9 +35,9 @@
   <div class="admin-links">
     <a href="/admin/users" class="btn btn-ghost">All Users</a>
     <a href="/admin/badges" class="btn btn-ghost">Manage Badges</a>
+    <a href="/admin/tags" class="btn btn-ghost">Manage Tags</a>
   </div>
 
-  {# --- Pending Actions (Architect only) --- #}
   {% if user.rank >= 12 and pending_actions %}
   <div class="section">
     <h2>Pending Admin Actions</h2>
@@ -45,7 +45,10 @@
     <div class="row">
       <div class="info">
         <div class="name">{{ action_summaries[a.id] }}</div>
-        <div class="detail">by {{ a_admins[a.admin_id].username if a.admin_id in a_admins else '?' }} &middot; {{ a.created_at.strftime('%Y-%m-%d %H:%M') }}</div>
+        <div class="detail">by {{
+          (a_admins[a.admin_id].username ~ (' Deleted' if a_admins[a.admin_id].is_deleted else ''))
+          if a.admin_id in a_admins else '?'
+        }} &middot; {{ a.created_at.strftime('%Y-%m-%d %H:%M') }}</div>
       </div>
       <div class="actions">
         <form method="post" action="/admin/actions/{{ a.id }}/approve" style="margin:0;">
@@ -60,14 +63,13 @@
   </div>
   {% endif %}
 
-  {# --- Pending Registrations --- #}
   <div class="section">
     <h2>Pending Registrations</h2>
     {% if pending_users %}
       {% for u in pending_users %}
       <div class="row">
         <div class="info">
-          <div class="name">{{ u.username }}</div>
+          <div class="name">{{ u.username }}{% if u.is_deleted %} Deleted{% endif %}</div>
           <div class="detail">{{ u.bio or 'No bio' }} &middot; {{ u.created_at.strftime('%Y-%m-%d %H:%M') }}</div>
         </div>
         <div class="actions">
@@ -86,7 +88,6 @@
     {% endif %}
   </div>
 
-  {# --- Pending Suggestions --- #}
   <div class="section">
     <h2>Pending Suggestions</h2>
     {% if pending_suggestions %}
@@ -94,7 +95,10 @@
       <div class="row">
         <div class="info">
           <div class="name"><a href="/corners/suggestions/{{ s.id }}">{{ s.title }}</a></div>
-          <div class="detail">by {{ s_authors[s.author_id].username if s.author_id in s_authors else 'Unknown' }} &middot; {{ s.created_at.strftime('%Y-%m-%d') }}</div>
+          <div class="detail">by {{
+            (s_authors[s.author_id].username ~ (' Deleted' if s_authors[s.author_id].is_deleted else ''))
+            if s.author_id in s_authors else 'Unknown'
+          }} &middot; {{ s.created_at.strftime('%Y-%m-%d') }}</div>
         </div>
         <div class="actions">
           <form method="post" action="/admin/suggestion/approve/{{ s.id }}" style="margin:0;">
@@ -111,14 +115,15 @@
     {% endif %}
   </div>
 
-  {# --- Banned Users --- #}
   <div class="section">
     <h2>Banned Users</h2>
     {% if banned_users %}
       {% for u in banned_users %}
       <div class="row">
         <div class="info">
-          <div class="name"><a href="/user/{{ u.username }}">{{ u.username }}</a></div>
+          <div class="name">
+            <a href="/user/{{ u.username }}">{{ u.username }}{% if u.is_deleted %} Deleted{% endif %}</a>
+          </div>
           <div class="detail">Banned &middot; joined {{ u.created_at.strftime('%Y-%m-%d') }}</div>
         </div>
         <div class="actions">
@@ -133,7 +138,6 @@
     {% endif %}
   </div>
 
-  {# --- Corners Management --- #}
   <div class="section">
     <h2>Corners</h2>
 
@@ -144,8 +148,13 @@
         <span class="c-icon">{{ c.icon }}</span>
         <div class="c-info">
           <div class="c-name">{{ c.name }}</div>
-          <div class="c-meta">/corners/{{ c.slug }} &middot; {{ c.template_type }}-style</div>
+          <div class="c-meta">/corners/{{ c.slug }} &middot; {{ c.template_type }}-style{% if c.is_external %} &middot; External ({{ external_counts[c.id] if c.id in external_counts else 0 }} users){% endif %}</div>
         </div>
+        {% if c.slug != 'library' and c.slug != 'suggestions' %}
+          <form method="post" action="/admin/corner/{{ c.id }}/delete" style="margin:0;">
+            <button class="btn btn-danger btn-sm" type="submit" onclick="return confirm('Delete this corner permanently?')">Delete</button>
+          </form>
+        {% endif %}
       </div>
       {% endfor %}
     </div>
@@ -188,6 +197,13 @@
           <div style="flex:0 0 auto;">
             <button class="btn btn-primary" type="submit" style="margin-bottom:0;">Create Corner</button>
           </div>
+        </div>
+
+        <div class="form-row" style="margin-top:-.35rem;">
+          <label for="c-external" style="display:flex; align-items:center; gap:.5rem;">
+            <input id="c-external" name="is_external" type="checkbox" value="true" style="width:auto; margin:0; margin-bottom:0;">
+            Mark as External
+          </label>
         </div>
       </form>
     </div>

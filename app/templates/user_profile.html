@@ -27,24 +27,93 @@
   <div class="card">
     <div class="profile-header">
       <div>
-        <h1>{{ profile.username }}</h1>
+        <h1>{{ profile.username }}{% if profile.is_deleted %} Deleted{% endif %}</h1>
         <div class="badges">
           <span class="rank-badge">{{ get_rank_name(profile.rank) }}</span>
-          {% if profile.is_banned %}<span class="badge badge-banned">Banned</span>{% endif %}
+          {% if profile.is_deleted %}
+            <button type="button" class="badge badge-banned" style="cursor:pointer;" onclick="openDeleteReasonModal()">Deleted</button>
+          {% elif profile.is_banned %}
+            <button type="button" class="badge badge-banned" style="cursor:pointer;" onclick="openBanReasonModal()">Banned</button>
+          {% endif %}
         </div>
+        {% if profile_has_privileges %}
+          <div style="margin-top:.5rem;">
+            <a href="/user/{{ profile.username }}/logs" class="btn btn-ghost btn-sm">Log</a>
+          </div>
+        {% endif %}
+        {% if profile.id != user.id %}
+          <div style="margin-top:.5rem;">
+            {% if is_following %}
+              <form method="post" action="/user/{{ profile.username }}/unfollow" style="margin:0;">
+                <button class="btn btn-ghost btn-sm" type="submit">Unfollow</button>
+              </form>
+            {% else %}
+              <form method="post" action="/user/{{ profile.username }}/follow" style="margin:0;">
+                <button class="btn btn-primary btn-sm" type="submit">Follow</button>
+              </form>
+            {% endif %}
+          </div>
+        {% endif %}
       </div>
       {% if has_privilege(user, "admin") and profile.rank < user.rank %}
-        {% if profile.is_banned %}
-        <form method="post" action="/admin/unban/{{ profile.id }}" style="margin:0;">
-          <button class="btn btn-ghost btn-sm" type="submit">Unban</button>
-        </form>
-        {% else %}
-        <form method="post" action="/admin/ban/{{ profile.id }}" style="margin:0;">
-          <button class="btn btn-danger btn-sm" type="submit" onclick="return confirm('Ban this user?')">Ban</button>
-        </form>
+        {% if not profile.is_deleted %}
+          {% if profile.is_banned %}
+            <form method="post" action="/admin/unban/{{ profile.id }}" style="margin:0;">
+              <button class="btn btn-ghost btn-sm" type="submit">Unban</button>
+            </form>
+          {% else %}
+            <form method="post" action="/admin/ban/{{ profile.id }}" style="margin:0;">
+              <div class="mini-form" style="margin:0 0 .35rem 0;">
+                <textarea name="reason" placeholder="Reason for ban..." maxlength="500" required></textarea>
+              </div>
+              <button class="btn btn-danger btn-sm" type="submit" onclick="return confirm('Ban this user?')">Ban</button>
+            </form>
+          {% endif %}
+
+          {% if profile.rank < 11 %}
+            <form method="post" action="/admin/user/{{ profile.id }}/delete" style="margin:0; margin-top:.25rem;">
+              <div class="mini-form" style="margin:0 0 .35rem 0;">
+                <textarea name="reason" placeholder="Reason for deletion..." maxlength="500" required></textarea>
+              </div>
+              <button class="btn btn-danger btn-sm" type="submit" onclick="return confirm('Delete this user?')">Delete</button>
+            </form>
+          {% endif %}
         {% endif %}
       {% endif %}
     </div>
+
+    {% if profile.is_deleted %}
+    <div id="deleteReasonModal" class="modal-overlay" style="display:none;" onclick="if(event.target===this)closeDeleteReasonModal()">
+      <div class="modal-box">
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:1rem;">
+          <h3 style="font-size:1rem; margin:0;">Deletion Reason</h3>
+          <button onclick="closeDeleteReasonModal()" style="background:none; border:none; font-size:1.4rem; cursor:pointer; color:var(--text); line-height:1;">&times;</button>
+        </div>
+        <p style="white-space:pre-wrap; font-size:.9rem; color:var(--text-muted);">{{ profile.deleted_reason or 'No reason provided.' }}</p>
+        <p style="margin-top:.8rem; font-size:.78rem; color:var(--text-faint);">Deleted {{ profile.deleted_at.strftime('%B %d, %Y') if profile.deleted_at else 'Unknown date' }}</p>
+      </div>
+    </div>
+    <script>
+      function openDeleteReasonModal(){ document.getElementById('deleteReasonModal').style.display='flex'; }
+      function closeDeleteReasonModal(){ document.getElementById('deleteReasonModal').style.display='none'; }
+    </script>
+    {% endif %}
+
+    {% if profile.is_banned %}
+    <div id="banReasonModal" class="modal-overlay" style="display:none;" onclick="if(event.target===this)closeBanReasonModal()">
+      <div class="modal-box">
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:1rem;">
+          <h3 style="font-size:1rem; margin:0;">Ban Reason</h3>
+          <button onclick="closeBanReasonModal()" style="background:none; border:none; font-size:1.4rem; cursor:pointer; color:var(--text); line-height:1;">&times;</button>
+        </div>
+        <p style="white-space:pre-wrap; font-size:.9rem; color:var(--text-muted);">{{ profile.ban_reason or 'No reason provided.' }}</p>
+      </div>
+    </div>
+    <script>
+      function openBanReasonModal(){ document.getElementById('banReasonModal').style.display='flex'; }
+      function closeBanReasonModal(){ document.getElementById('banReasonModal').style.display='none'; }
+    </script>
+    {% endif %}
 
     {% if titles %}
     <div class="titles-row">
@@ -80,7 +149,7 @@
     <p class="profile-bio" style="font-style:italic;">No bio provided.</p>
     {% endif %}
 
-    <p class="profile-meta">Member since {{ profile.created_at.strftime('%B %d, %Y') }}</p>
+    <p class="profile-meta">Member since {{ profile.created_at.strftime('%B %d, %Y') }} &middot; {{ followers_count }} followers &middot; {{ following_count }} following</p>
 
     <div class="stat-grid mb-2">
       <div class="stat-box"><div class="num">{{ books|length }}</div><div class="label">Books</div></div>
