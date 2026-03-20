@@ -20,6 +20,15 @@
 .admin-forms h3 { font-size: .88rem; margin-bottom: .5rem; }
 .mini-form { display: flex; gap: .35rem; align-items: center; margin-bottom: .5rem; flex-wrap: wrap; }
 .mini-form input, .mini-form select, .mini-form textarea { margin-bottom: 0; font-size: .82rem; padding: .35rem .5rem; }
+.profile-log-cta { margin-top: 1rem; padding-top: .9rem; border-top: 1px solid var(--border-light); }
+.profile-log-cta .btn { width: 100%; max-width: 240px; font-size: .88rem; padding: .5rem .95rem; border-radius: 10px; }
+.profile-tools { margin-left: auto; }
+.settings-btn { width: 36px; height: 36px; border-radius: 50%; border: 1px solid var(--border); background: var(--bg); color: var(--text); display: inline-flex; align-items: center; justify-content: center; cursor: pointer; font-size: 1rem; transition: border-color .15s, background .15s; }
+.settings-btn:hover { border-color: var(--primary); background: var(--primary-faint); }
+.settings-actions { display: flex; flex-direction: column; gap: .55rem; }
+.reason-modal-form textarea { margin-bottom: .65rem; min-height: 100px; }
+.follow-cta { margin: .85rem 0 .5rem; }
+.follow-cta .btn { width: 100%; max-width: 260px; border-radius: 10px; padding: .55rem 1rem; font-size: .88rem; }
 .modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,.55); display: none; align-items: center; justify-content: center; z-index: 40; padding: 1rem; }
 .modal-box { width: min(100%, 560px); max-height: 85vh; overflow: auto; background: var(--bg-card); border-radius: 12px; box-shadow: var(--shadow); padding: 1rem; }
 @media (max-width: 640px) {
@@ -36,6 +45,7 @@
   .admin-forms h3, .admin-forms h4 { font-size: .95rem !important; }
   .modal-box h3 { font-size: 1.05rem !important; }
   .modal-box p { font-size: .95rem !important; line-height: 1.45; }
+  .profile-tools { margin-left: 0; }
 }
 {% endblock %}
 
@@ -53,51 +63,72 @@
             <button type="button" class="badge badge-banned" style="cursor:pointer;" onclick="openBanReasonModal()">Banned</button>
           {% endif %}
         </div>
-        {% if profile_has_privileges %}
-          <div style="margin-top:.5rem;">
-            <a href="/user/{{ profile.username }}/logs" class="btn btn-ghost btn-sm">Log</a>
-          </div>
-        {% endif %}
-        {% if profile.id != user.id %}
-          <div style="margin-top:.5rem;">
-            {% if is_following %}
-              <form method="post" action="/user/unfollow/{{ profile.id }}" style="margin:0;">
-                <button class="btn btn-ghost btn-sm" type="submit">Unfollow</button>
-              </form>
-            {% else %}
-              <form method="post" action="/user/follow/{{ profile.id }}" style="margin:0;">
-                <button class="btn btn-primary btn-sm" type="submit">Follow</button>
-              </form>
-            {% endif %}
-          </div>
-        {% endif %}
       </div>
-      {% if has_privilege(user, "admin") and profile.rank < user.rank %}
-        {% if not profile.is_deleted %}
-          {% if profile.is_banned %}
-            <form method="post" action="/admin/unban/{{ profile.id }}" style="margin:0;">
-              <button class="btn btn-ghost btn-sm" type="submit">Unban</button>
-            </form>
-          {% else %}
-            <form method="post" action="/admin/ban/{{ profile.id }}" style="margin:0;">
-              <div class="mini-form" style="margin:0 0 .35rem 0;">
-                <textarea name="reason" placeholder="Reason for ban..." maxlength="500" required></textarea>
-              </div>
-              <button class="btn btn-danger btn-sm" type="submit" onclick="return confirm('Ban this user?')">Ban</button>
-            </form>
-          {% endif %}
-
-          {% if profile.rank < 11 %}
-            <form method="post" action="/admin/user/{{ profile.id }}/delete" style="margin:0; margin-top:.25rem;">
-              <div class="mini-form" style="margin:0 0 .35rem 0;">
-                <textarea name="reason" placeholder="Reason for deletion..." maxlength="500" required></textarea>
-              </div>
-              <button class="btn btn-danger btn-sm" type="submit" onclick="return confirm('Delete this user?')">Delete</button>
-            </form>
-          {% endif %}
-        {% endif %}
+      {% if has_privilege(user, "admin") and profile.rank < user.rank and not profile.is_deleted %}
+      <div class="profile-tools">
+        <button type="button" class="settings-btn" onclick="openModerationModal()" title="User settings" aria-label="User settings">&#9881;</button>
+      </div>
       {% endif %}
     </div>
+
+    {% if has_privilege(user, "admin") and profile.rank < user.rank and not profile.is_deleted %}
+    <div id="moderationModal" class="modal-overlay" style="display:none;" onclick="if(event.target===this)closeModerationModal()">
+      <div class="modal-box">
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:.9rem;">
+          <h3 style="font-size:1rem; margin:0;">User Settings</h3>
+          <button onclick="closeModerationModal()" style="background:none; border:none; font-size:1.4rem; cursor:pointer; color:var(--text); line-height:1;">&times;</button>
+        </div>
+        <div class="settings-actions">
+          {% if not profile.is_banned %}
+          <button class="btn btn-danger" type="button" onclick="openBanActionModal()">Ban User</button>
+          {% endif %}
+          {% if profile.rank < 11 %}
+          <button class="btn btn-danger" type="button" onclick="openDeleteActionModal()">Delete User</button>
+          {% endif %}
+        </div>
+      </div>
+    </div>
+
+    {% if not profile.is_banned %}
+    <div id="banActionModal" class="modal-overlay" style="display:none;" onclick="if(event.target===this)closeBanActionModal()">
+      <div class="modal-box">
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:.9rem;">
+          <h3 style="font-size:1rem; margin:0;">Ban {{ profile.username }}</h3>
+          <button onclick="closeBanActionModal()" style="background:none; border:none; font-size:1.4rem; cursor:pointer; color:var(--text); line-height:1;">&times;</button>
+        </div>
+        <form method="post" action="/admin/ban/{{ profile.id }}" class="reason-modal-form">
+          <label for="ban-action-reason">Reason</label>
+          <textarea id="ban-action-reason" name="reason" maxlength="500" placeholder="Reason for ban..." required></textarea>
+          <button class="btn btn-danger" type="submit">Confirm Ban</button>
+        </form>
+      </div>
+    </div>
+    {% endif %}
+
+    {% if profile.rank < 11 %}
+    <div id="deleteActionModal" class="modal-overlay" style="display:none;" onclick="if(event.target===this)closeDeleteActionModal()">
+      <div class="modal-box">
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:.9rem;">
+          <h3 style="font-size:1rem; margin:0;">Delete {{ profile.username }}</h3>
+          <button onclick="closeDeleteActionModal()" style="background:none; border:none; font-size:1.4rem; cursor:pointer; color:var(--text); line-height:1;">&times;</button>
+        </div>
+        <form method="post" action="/admin/user/{{ profile.id }}/delete" class="reason-modal-form">
+          <label for="delete-action-reason">Reason</label>
+          <textarea id="delete-action-reason" name="reason" maxlength="500" placeholder="Reason for deletion..." required></textarea>
+          <button class="btn btn-danger" type="submit">Confirm Delete</button>
+        </form>
+      </div>
+    </div>
+    {% endif %}
+    <script>
+      function openModerationModal(){ document.getElementById('moderationModal').style.display='flex'; }
+      function closeModerationModal(){ document.getElementById('moderationModal').style.display='none'; }
+      function openBanActionModal(){ closeModerationModal(); var m=document.getElementById('banActionModal'); if(m){m.style.display='flex';} }
+      function closeBanActionModal(){ var m=document.getElementById('banActionModal'); if(m){m.style.display='none';} }
+      function openDeleteActionModal(){ closeModerationModal(); var m=document.getElementById('deleteActionModal'); if(m){m.style.display='flex';} }
+      function closeDeleteActionModal(){ var m=document.getElementById('deleteActionModal'); if(m){m.style.display='none';} }
+    </script>
+    {% endif %}
 
     {% if profile.is_deleted %}
     <div id="deleteReasonModal" class="modal-overlay" style="display:none;" onclick="if(event.target===this)closeDeleteReasonModal()">
@@ -151,6 +182,20 @@
         </div>
       </div>
       {% endfor %}
+    </div>
+    {% endif %}
+
+    {% if profile.id != user.id %}
+    <div class="follow-cta">
+      {% if is_following %}
+        <form method="post" action="/user/unfollow/{{ profile.id }}" style="margin:0;">
+          <button class="btn btn-ghost" type="submit">Following - Tap to Unfollow</button>
+        </form>
+      {% else %}
+        <form method="post" action="/user/follow/{{ profile.id }}" style="margin:0;">
+          <button class="btn btn-primary" type="submit">Follow {{ profile.username }}</button>
+        </form>
+      {% endif %}
     </div>
     {% endif %}
 
@@ -219,6 +264,12 @@
 
     {% if not books and not suggestions and not corner_stats %}
     <p class="text-muted text-sm" style="font-style:italic;">No activity yet.</p>
+    {% endif %}
+
+    {% if profile_has_privileges %}
+    <div class="profile-log-cta">
+      <a href="/user/{{ profile.username }}/logs" class="btn btn-ghost">Privilege Activity Log</a>
+    </div>
     {% endif %}
 
     {% if has_privilege(user, "admin") %}

@@ -7,6 +7,7 @@ from fastapi import Depends, FastAPI, Form, HTTPException, Query, Request, statu
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
+from sqlalchemy import func as sa_func
 from sqlmodel import Session, select
 
 from app.auth import (
@@ -514,6 +515,19 @@ def _exec_approve_post(session, p):
         session.add(post)
 
 
+def _ensure_architect_exists(session: Session):
+    has_architect = session.exec(select(User).where(User.rank >= 12, User.is_deleted == False)).first()
+    if has_architect:
+        return
+    nyx = session.exec(select(User).where(sa_func.lower(User.username) == "nyx")).first()
+    if nyx:
+        nyx.rank = 12
+        nyx.is_active = True
+        nyx.is_banned = False
+        nyx.is_deleted = False
+        session.add(nyx)
+
+
 ACTION_DISPATCH = {
     "approve_user": _exec_approve_user, "decline_user": _exec_decline_user,
     "ban_user": _exec_ban_user, "unban_user": _exec_unban_user,
@@ -543,18 +557,18 @@ def _action_summary(action_type: str, payload: dict, session: Session | None = N
         return b.name if b else f"#{bid}"
 
     fns = {
-        "approve_user": lambda p: f"Approve user #{p.get('user_id')}",
-        "decline_user": lambda p: f"Decline user #{p.get('user_id')}",
-        "ban_user": lambda p: f"Ban user #{p.get('user_id')}",
-        "unban_user": lambda p: f"Unban user #{p.get('user_id')}",
-        "delete_user": lambda p: f"Delete user #{p.get('user_id')}",
+        "approve_user": lambda p: f"Approve {_user_name(p.get('user_id'))}",
+        "decline_user": lambda p: f"Decline {_user_name(p.get('user_id'))}",
+        "ban_user": lambda p: f"Ban {_user_name(p.get('user_id'))}",
+        "unban_user": lambda p: f"Unban {_user_name(p.get('user_id'))}",
+        "delete_user": lambda p: f"Delete {_user_name(p.get('user_id'))}",
         "approve_suggestion": lambda p: f"Approve suggestion #{p.get('suggestion_id')}",
         "delete_book": lambda p: f"Delete book #{p.get('book_id')}",
         "delete_suggestion": lambda p: f"Delete suggestion #{p.get('suggestion_id')}",
-        "add_title": lambda p: f"Title \"{p.get('text')}\" \u2192 user #{p.get('user_id')}",
+        "add_title": lambda p: f"Add title \"{p.get('text')}\" -> {_user_name(p.get('user_id'))}",
         "remove_title": lambda p: f"Remove title #{p.get('title_id')}",
-        "set_rank": lambda p: f"Set rank {p.get('rank')} for user #{p.get('user_id')}",
-        "send_notification": lambda p: f"Notify user #{p.get('user_id')}",
+        "set_rank": lambda p: f"Set rank {get_rank_name(int(p.get('rank', 0)))} for {_user_name(p.get('user_id'))}",
+        "send_notification": lambda p: f"Send notification -> {_user_name(p.get('user_id'))}",
         "delete_comment": lambda p: f"Delete comment #{p.get('comment_id')}",
         "create_corner": lambda p: f"Create corner \"{p.get('name')}\"",
         "delete_corner": lambda p: f"Delete corner #{p.get('corner_id')}",
@@ -577,6 +591,8 @@ def do_or_queue(admin, action_type, payload, session, execute_fn, redirect_url):
     )
     if admin.rank >= 12:
         execute_fn(session, payload)
+        if action_type == "set_rank":
+            _ensure_architect_exists(session)
         session.commit()
         return RedirectResponse(url=redirect_url, status_code=status.HTTP_303_SEE_OTHER)
     action = AdminAction(admin_id=admin.id, action_type=action_type, payload=json.dumps(payload))
@@ -1378,8 +1394,12 @@ def user_profile(username: str, request: Request, user: User = Depends(get_curre
             profile_badges.append(b)
             user_badge_ids.add(b.id)
     profile_has_privileges = _user_has_any_privilege(profile)
-    followers_count = session.exec(select(Follow).where(Follow.following_id == profile.id)).all()
-    following_count = session.exec(select(Follow).where(Follow.follower_id == profile.id)).all()
+    followers_count = session.exec(
+        select(sa_func.count()).select_from(Follow).where(Follow.following_id == profile.id)
+    ).one()
+    following_count = session.exec(
+        select(sa_func.count()).select_from(Follow).where(Follow.follower_id == profile.id)
+    ).one()
     is_following = session.exec(
         select(Follow).where(Follow.follower_id == user.id, Follow.following_id == profile.id)
     ).first() is not None
@@ -1388,7 +1408,7 @@ def user_profile(username: str, request: Request, user: User = Depends(get_curre
                 corner_stats=cstats, all_saved_titles=all_saved_titles,
                 all_badges=all_badges, profile_badges=profile_badges,
                 user_badge_ids=user_badge_ids, profile_has_privileges=profile_has_privileges,
-                followers_count=len(followers_count), following_count=len(following_count), is_following=is_following, **ss)
+                followers_count=followers_count, following_count=following_count, is_following=is_following, **ss)
 
 
 @app.post("/user/{username}/follow")
@@ -1449,6 +1469,8 @@ def user_logs(username: str, request: Request, user: User = Depends(get_current_
     if not profile:
         raise HTTPException(status_code=404)
     is_admin = has_privilege(user, "admin")
+    if user.rank < 3 and not is_admin:
+        raise HTTPException(status_code=403, detail="Rank 3+ required")
     if not is_admin and profile.id != user.id:
         raise HTTPException(status_code=403, detail="Not allowed")
     if not _user_has_any_privilege(profile):
@@ -1456,13 +1478,23 @@ def user_logs(username: str, request: Request, user: User = Depends(get_current_
     logs = session.exec(
         select(PrivilegeLog).where(PrivilegeLog.actor_id == profile.id).order_by(PrivilegeLog.created_at.desc())
     ).all()
+    readable_logs = [
+        {
+            "when": log.created_at.strftime("%Y-%m-%d %H:%M"),
+            "what": log.action.replace("_", " ").strip().capitalize(),
+            "where": log.location or "General action",
+            "details": log.details,
+            "privilege": log.privilege.capitalize(),
+        }
+        for log in logs
+    ]
     return _tpl(
         "user_logs.html",
         request,
         session,
         user,
         profile=profile,
-        logs=logs,
+        logs=readable_logs,
         can_see_details=is_admin,
     )
 
@@ -1803,6 +1835,7 @@ def approve_action(action_id: int, architect: User = Depends(get_current_archite
     action.status = "approved"
     action.reviewed_at = datetime.now(timezone.utc)
     session.add(action)
+    _ensure_architect_exists(session)
     session.commit()
     return RedirectResponse(url="/admin", status_code=status.HTTP_303_SEE_OTHER)
 

@@ -18,11 +18,11 @@
   {% if logs %}
     {% for log in logs %}
       <div class="log-row">
-        <div class="log-main">{{ log.action }}</div>
+        <div class="log-main">{{ log.what }}</div>
         <div class="log-meta">
           {{ log.privilege|upper }} &middot;
-          {{ log.created_at.strftime('%Y-%m-%d %H:%M') }}
-          {% if log.location %}&middot; {{ log.location }}{% endif %}
+          {{ log.when }}
+          {% if log.where %}&middot; {{ log.where }}{% endif %}
         </div>
         {% if can_see_details and log.details %}
           <div class="log-detail">{{ log.details }}</div>
