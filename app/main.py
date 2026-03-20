@@ -43,8 +43,8 @@ BUILTIN_CORNERS = [
 ]
 
 BUILTIN_TAGS = [
-    {"slug": "illegal", "name": "Illegal", "tag_type": "illegal", "min_rank": 5},
-    {"slug": "18plus", "name": "18+", "tag_type": "18plus", "min_rank": 1},
+    {"slug": "illegal", "name": "Illegal", "tag_type": "rank_gated", "min_rank": 5, "required_badge_id": None},
+    {"slug": "18plus", "name": "18+", "tag_type": "badge_gated", "min_rank": 1, "required_badge_id": None},
 ]
 
 
@@ -99,6 +99,11 @@ async def lifespan(_app: FastAPI):
             conn.commit()
         except Exception:
             pass
+        try:
+            conn.execute(sa_text("ALTER TABLE tag ADD COLUMN required_badge_id INTEGER REFERENCES badge(id)"))
+            conn.commit()
+        except Exception:
+            pass
     with Session(engine) as s:
         for c in BUILTIN_CORNERS:
             if not s.exec(select(Corner).where(Corner.slug == c["slug"])).first():
@@ -106,6 +111,18 @@ async def lifespan(_app: FastAPI):
         for t in BUILTIN_TAGS:
             if not s.exec(select(Tag).where(Tag.slug == t["slug"])).first():
                 s.add(Tag(**t))
+        for t in s.exec(select(Tag)).all():
+            if t.tag_type == "illegal":
+                t.tag_type = "rank_gated"
+                s.add(t)
+            elif t.tag_type == "18plus":
+                t.tag_type = "badge_gated"
+                s.add(t)
+        first_18_badge = s.exec(select(Badge).where(Badge.can_view_18plus == True)).first()
+        for t in s.exec(select(Tag).where(Tag.tag_type == "badge_gated")).all():
+            if t.required_badge_id is None and first_18_badge and first_18_badge.id is not None:
+                t.required_badge_id = first_18_badge.id
+                s.add(t)
         has_architect = s.exec(select(User).where(User.rank >= 12)).first()
         if not has_architect:
             nyx = s.exec(select(User).where(sa_func.lower(User.username) == "nyx")).first()
@@ -132,6 +149,18 @@ def _tpl(name, request, session=None, user=None, status_code=200, **ctx):
         uc = len(session.exec(select(Notification).where(
             Notification.user_id == user.id, Notification.is_read == False
         )).all())
+        if "user_badge_ids" not in ctx:
+            ctx["user_badge_ids"] = {
+                ub.badge_id
+                for ub in session.exec(select(UserBadge.badge_id).where(UserBadge.user_id == user.id)).all()  # type: ignore[attr-defined]
+                if ub.badge_id is not None
+            }
+        if "can_view_18plus" not in ctx:
+            ctx["can_view_18plus"] = _user_can_view_18plus(session, user)
+    if "user_badge_ids" not in ctx:
+        ctx["user_badge_ids"] = set()
+    if "can_view_18plus" not in ctx:
+        ctx["can_view_18plus"] = False
     resp = templates.TemplateResponse(name, {"request": request, "user": user, "unread_count": uc, **ctx})
     if status_code != 200:
         resp.status_code = status_code
@@ -150,12 +179,11 @@ def _suggestion_stats(session: Session, user_id: int, viewer: User | None = None
         approved = sum(1 for s in subs if s.is_approved)
         return {"suggestions": subs, "s_count": len(subs), "s_up": up, "s_down": down, "s_approved": approved}
 
-    can_view_18plus = _user_can_view_18plus(session, viewer)
     suggestion_ids = [s.id for s in subs if s.id is not None]
     tags_by_s = _load_tags_for_suggestions(session, suggestion_ids)
     visible_subs = [
         s for s in subs
-        if s.id is not None and _tags_visible_for_user(viewer, tags_by_s.get(s.id, []), can_view_18plus)
+        if s.id is not None and _tags_visible_for_user(session, viewer, tags_by_s.get(s.id, []))
     ]
     s_ids = [s.id for s in visible_subs if s.id is not None]
     up = down = 0
@@ -204,26 +232,41 @@ def _user_can_view_18plus(session: Session, user: User) -> bool:
     return bool(user_badge_ids & allowed_badge_ids)
 
 
-def _tag_visible_for_user(user: User, tag: Tag, can_view_18plus: bool) -> bool:
+def _tag_visible_for_user(session: Session, user: User, tag: Tag) -> bool:
     if has_privilege(user, "admin"):
         return True
-    if tag.tag_type == "illegal":
+    tt = tag.tag_type
+    if tt == "normal":
+        return True
+    if tt in ("illegal", "rank_gated"):
         return user.rank >= tag.min_rank
-    if tag.tag_type == "18plus":
-        return can_view_18plus
+    if tt == "18plus":
+        return _user_can_view_18plus(session, user)
+    if tt == "badge_gated":
+        if tag.required_badge_id is None:
+            return False
+        return (
+            session.exec(
+                select(UserBadge).where(
+                    UserBadge.user_id == user.id,
+                    UserBadge.badge_id == tag.required_badge_id,
+                )
+            ).first()
+            is not None
+        )
     return True
 
 
-def _tags_visible_for_user(user: User, tags: list[Tag], can_view_18plus: bool) -> bool:
-    return all(_tag_visible_for_user(user, t, can_view_18plus) for t in tags)
+def _tags_visible_for_user(session: Session, user: User, tags: list[Tag]) -> bool:
+    return all(_tag_visible_for_user(session, user, t) for t in tags)
 
 
-def _filter_tags_visible_for_user(user: User, tags: list[Tag], can_view_18plus: bool) -> list[Tag]:
-    return [t for t in tags if _tag_visible_for_user(user, t, can_view_18plus)]
+def _filter_tags_visible_for_user(session: Session, user: User, tags: list[Tag]) -> list[Tag]:
+    return [t for t in tags if _tag_visible_for_user(session, user, t)]
 
 
 def _sanitize_tag_query_for_user(
-    user: User, tag: str | None, corner_tags: list[Tag], can_view_18plus: bool
+    session: Session, user: User, tag: str | None, corner_tags: list[Tag]
 ) -> str | None:
     """Drop tag filter if it names a corner tag the user is not allowed to view."""
     if not tag or not str(tag).strip():
@@ -231,19 +274,34 @@ def _sanitize_tag_query_for_user(
     raw = str(tag).strip()
     for t in corner_tags:
         if t.slug == raw or t.name == raw:
-            if not _tag_visible_for_user(user, t, can_view_18plus):
+            if not _tag_visible_for_user(session, user, t):
                 return None
             break
     return raw
 
 
-def _tag_selectable_for_user(user: User, tag: Tag, is_admin: bool, can_view_18plus: bool) -> bool:
+def _tag_selectable_for_user(session: Session, user: User, tag: Tag, is_admin: bool) -> bool:
     if is_admin:
         return True
-    if tag.tag_type == "illegal":
+    tt = tag.tag_type
+    if tt == "normal":
+        return True
+    if tt in ("illegal", "rank_gated"):
         return user.rank >= tag.min_rank
-    if tag.tag_type == "18plus":
-        return can_view_18plus
+    if tt == "18plus":
+        return _user_can_view_18plus(session, user)
+    if tt == "badge_gated":
+        if tag.required_badge_id is None:
+            return False
+        return (
+            session.exec(
+                select(UserBadge).where(
+                    UserBadge.user_id == user.id,
+                    UserBadge.badge_id == tag.required_badge_id,
+                )
+            ).first()
+            is not None
+        )
     return True
 
 
@@ -462,6 +520,11 @@ def _split_book_pages(raw: str) -> list[str]:
     parts = re.split(r"\r?\n\s*---\s*page\s*---\s*\r?\n", text, flags=re.IGNORECASE)
     chunks = [p.strip() for p in parts if p.strip()]
     return chunks if chunks else [text]
+
+
+def _library_tags_for_write(session: Session) -> list[Tag]:
+    library_corner = session.exec(select(Corner).where(Corner.slug == "library")).first()
+    return _available_tags_for_corner(session, library_corner.id if library_corner else None)
 
 
 def _book_editor_content(session: Session, book: Book) -> str:
@@ -802,9 +865,8 @@ def library(
     if library_corner and library_corner.is_hidden and not has_privilege(user, "admin"):
         raise HTTPException(status_code=404)
     all_corner_tags = _available_tags_for_corner(session, library_corner.id if library_corner else None)
-    can_view_18plus = _user_can_view_18plus(session, user)
-    tag = _sanitize_tag_query_for_user(user, tag, all_corner_tags, can_view_18plus)
-    available_tags = _filter_tags_visible_for_user(user, all_corner_tags, can_view_18plus)
+    tag = _sanitize_tag_query_for_user(session, user, tag, all_corner_tags)
+    available_tags = _filter_tags_visible_for_user(session, user, all_corner_tags)
     book_ids = [b.id for b in books if b.id is not None]
     tags_by_book = _load_tags_for_books(session, book_ids)
     visible_books = []
@@ -814,7 +876,7 @@ def library(
         book_tags = tags_by_book.get(b.id, [])
         if tag and not any((t.slug == tag or t.name == tag) for t in book_tags):
             continue
-        if _tags_visible_for_user(user, book_tags, can_view_18plus):
+        if _tags_visible_for_user(session, user, book_tags):
             visible_books.append(b)
     authors: dict[int, User] = {}
     for b in visible_books:
@@ -827,10 +889,7 @@ def library(
 
 @app.get("/corners/library/write", response_class=HTMLResponse)
 def book_write_page(request: Request, user: User = Depends(get_current_user), session: Session = Depends(get_session)):
-    library_corner = session.exec(select(Corner).where(Corner.slug == "library")).first()
-    tags = _available_tags_for_corner(session, library_corner.id if library_corner else None)
-    can_view_18plus = _user_can_view_18plus(session, user)
-    return _tpl("book_write.html", request, session, user, tags=tags, can_view_18plus=can_view_18plus)
+    return _tpl("book_write.html", request, session, user, tags=_library_tags_for_write(session))
 
 
 @app.post("/corners/library/write", response_class=HTMLResponse)
@@ -844,8 +903,12 @@ def book_write(
     title, content = title.strip(), content.strip()
     parts = _split_book_pages(content)
     normalized_content = parts[0] if parts else ""
+    tags_for_form = _library_tags_for_write(session)
     if not title or not normalized_content:
-        return _tpl("book_write.html", request, session, user, error="Title and content are required.")
+        return _tpl(
+            "book_write.html", request, session, user,
+            tags=tags_for_form, error="Title and content are required.",
+        )
     book = Book(title=title, content=normalized_content, author_id=user.id)
     session.add(book)
     session.commit()
@@ -856,11 +919,10 @@ def book_write(
     if tag_ids:
         library_corner = session.exec(select(Corner).where(Corner.slug == "library")).first()
         library_corner_id = library_corner.id if library_corner else None
-        can_view_18plus = _user_can_view_18plus(session, user)
         is_admin = has_privilege(user, "admin")
         tags = session.exec(select(Tag).where(Tag.id.in_(tag_ids))).all()  # type: ignore[attr-defined]
         for t in tags:
-            if _tag_selectable_for_user(user, t, is_admin, can_view_18plus) and _tag_allowed_in_corner(session, t.id, library_corner_id):
+            if _tag_selectable_for_user(session, user, t, is_admin) and _tag_allowed_in_corner(session, t.id, library_corner_id):
                 session.add(BookTag(book_id=book.id, tag_id=t.id))
         session.commit()
     _notify_followers(session, user.id, f"{user.username} published a new book: {book.title}")
@@ -879,10 +941,9 @@ def book_detail(
     book = session.get(Book, book_id)
     if not book:
         raise HTTPException(status_code=404, detail="Book not found")
-    can_view_18plus = _user_can_view_18plus(session, user)
     tags_by_book = _load_tags_for_books(session, [book_id])
     tags = tags_by_book.get(book_id, [])
-    if not _tags_visible_for_user(user, tags, can_view_18plus):
+    if not _tags_visible_for_user(session, user, tags):
         raise HTTPException(status_code=403, detail="You cannot view this post.")
     if book.author_id != user.id:
         book.views += 1
@@ -907,7 +968,6 @@ def book_detail(
                 page_content=page_content,
                 current_page=current_page,
                 total_pages=total_pages,
-                can_view_18plus=can_view_18plus,
                 can_edit_tags=(book.author_id == user.id or has_privilege(user, "admin")),
                 can_edit_book=(book.author_id == user.id))
 
@@ -924,10 +984,9 @@ def book_edit_page(
         raise HTTPException(status_code=404)
     if book.author_id != user.id:
         raise HTTPException(status_code=403, detail="Only the author can edit this book")
-    can_view_18plus = _user_can_view_18plus(session, user)
     tags_by_book = _load_tags_for_books(session, [book_id])
     tags = tags_by_book.get(book_id, [])
-    if not _tags_visible_for_user(user, tags, can_view_18plus):
+    if not _tags_visible_for_user(session, user, tags):
         raise HTTPException(status_code=403, detail="You cannot view this post.")
     library_corner = session.exec(select(Corner).where(Corner.slug == "library")).first()
     all_tags = _available_tags_for_corner(session, library_corner.id if library_corner else None)
@@ -942,7 +1001,6 @@ def book_edit_page(
         body=body,
         tags=all_tags,
         selected_tag_ids=selected_ids,
-        can_view_18plus=can_view_18plus,
     )
 
 
@@ -967,7 +1025,6 @@ def book_edit(
     if not title or not normalized_content:
         library_corner = session.exec(select(Corner).where(Corner.slug == "library")).first()
         all_tags = _available_tags_for_corner(session, library_corner.id if library_corner else None)
-        can_view_18plus = _user_can_view_18plus(session, user)
         return _tpl(
             "book_edit.html",
             request,
@@ -977,7 +1034,6 @@ def book_edit(
             body=content,
             tags=all_tags,
             selected_tag_ids=tag_ids or [],
-            can_view_18plus=can_view_18plus,
             error="Title and content are required.",
         )
     book.title = title
@@ -992,14 +1048,13 @@ def book_edit(
     session.commit()
     library_corner = session.exec(select(Corner).where(Corner.slug == "library")).first()
     library_corner_id = library_corner.id if library_corner else None
-    can_view_18plus = _user_can_view_18plus(session, user)
     is_admin = has_privilege(user, "admin")
     for row in session.exec(select(BookTag).where(BookTag.book_id == book_id)).all():
         session.delete(row)
     if tag_ids:
         tags = session.exec(select(Tag).where(Tag.id.in_(tag_ids))).all()  # type: ignore[attr-defined]
         for t in tags:
-            if _tag_selectable_for_user(user, t, is_admin, can_view_18plus) and t.id is not None and _tag_allowed_in_corner(session, t.id, library_corner_id):
+            if _tag_selectable_for_user(session, user, t, is_admin) and t.id is not None and _tag_allowed_in_corner(session, t.id, library_corner_id):
                 session.add(BookTag(book_id=book.id, tag_id=t.id))
     session.commit()
     return RedirectResponse(url=f"/corners/library/{book.id}", status_code=status.HTTP_303_SEE_OTHER)
@@ -1016,7 +1071,6 @@ def book_set_tags(
     if not book:
         raise HTTPException(status_code=404)
     is_admin = has_privilege(user, "admin")
-    can_view_18plus = _user_can_view_18plus(session, user)
     if not (is_admin or book.author_id == user.id):
         raise HTTPException(status_code=403, detail="Not allowed")
 
@@ -1026,7 +1080,7 @@ def book_set_tags(
     library_corner_id = library_corner.id if library_corner else None
     allowed = [
         t for t in tags
-        if _tag_selectable_for_user(user, t, is_admin, can_view_18plus)
+        if _tag_selectable_for_user(session, user, t, is_admin)
         and t.id is not None
         and _tag_allowed_in_corner(session, t.id, library_corner_id)
     ]
@@ -1057,16 +1111,15 @@ def suggestions_list(
     is_approved = tab == "approved"
     items = session.exec(select(Suggestion).where(Suggestion.is_approved == is_approved)).all()
     all_corner_tags = _available_tags_for_corner(session, suggestion_corner.id if suggestion_corner else None)
-    can_view_18plus = _user_can_view_18plus(session, user)
-    tag = _sanitize_tag_query_for_user(user, tag, all_corner_tags, can_view_18plus)
-    available_tags = _filter_tags_visible_for_user(user, all_corner_tags, can_view_18plus)
+    tag = _sanitize_tag_query_for_user(session, user, tag, all_corner_tags)
+    available_tags = _filter_tags_visible_for_user(session, user, all_corner_tags)
     suggestion_ids = [s.id for s in items if s.id is not None]
     tags_by_s = _load_tags_for_suggestions(session, suggestion_ids)
     items = [
         s for s in items
         if s.id is not None
         and (not tag or any((t.slug == tag or t.name == tag) for t in tags_by_s.get(s.id, [])))
-        and _tags_visible_for_user(user, tags_by_s.get(s.id, []), can_view_18plus)
+        and _tags_visible_for_user(session, user, tags_by_s.get(s.id, []))
     ]
     scored = []
     authors: dict[int, User] = {}
@@ -1092,8 +1145,7 @@ def suggestions_list(
 def suggestion_write_page(request: Request, user: User = Depends(get_current_user), session: Session = Depends(get_session)):
     suggestion_corner = session.exec(select(Corner).where(Corner.slug == "suggestions")).first()
     tags = _available_tags_for_corner(session, suggestion_corner.id if suggestion_corner else None)
-    can_view_18plus = _user_can_view_18plus(session, user)
-    return _tpl("suggestion_write.html", request, session, user, tags=tags, can_view_18plus=can_view_18plus)
+    return _tpl("suggestion_write.html", request, session, user, tags=tags)
 
 
 @app.post("/corners/suggestions/write", response_class=HTMLResponse)
@@ -1113,11 +1165,10 @@ def suggestion_write(
     if tag_ids:
         suggestion_corner = session.exec(select(Corner).where(Corner.slug == "suggestions")).first()
         suggestion_corner_id = suggestion_corner.id if suggestion_corner else None
-        can_view_18plus = _user_can_view_18plus(session, user)
         is_admin = has_privilege(user, "admin")
         tags = session.exec(select(Tag).where(Tag.id.in_(tag_ids))).all()  # type: ignore[attr-defined]
         for t in tags:
-            if _tag_selectable_for_user(user, t, is_admin, can_view_18plus) and _tag_allowed_in_corner(session, t.id, suggestion_corner_id):
+            if _tag_selectable_for_user(session, user, t, is_admin) and _tag_allowed_in_corner(session, t.id, suggestion_corner_id):
                 session.add(SuggestionTag(suggestion_id=s.id, tag_id=t.id))
         session.commit()
     _notify_followers(session, user.id, f"{user.username} published a new suggestion: {s.title}")
@@ -1130,10 +1181,9 @@ def suggestion_detail(sid: int, request: Request, user: User = Depends(get_curre
     s = session.get(Suggestion, sid)
     if not s:
         raise HTTPException(status_code=404)
-    can_view_18plus = _user_can_view_18plus(session, user)
     tags_by_s = _load_tags_for_suggestions(session, [sid])
     s_tags = tags_by_s.get(sid, [])
-    if not _tags_visible_for_user(user, s_tags, can_view_18plus):
+    if not _tags_visible_for_user(session, user, s_tags):
         raise HTTPException(status_code=403, detail="You cannot view this post.")
     author = session.get(User, s.author_id)
     votes = session.exec(select(Vote).where(Vote.suggestion_id == s.id)).all()
@@ -1150,7 +1200,6 @@ def suggestion_detail(sid: int, request: Request, user: User = Depends(get_curre
                 all_tags=detail_tags,
                 s_tags=s_tags,
                 s_tag_ids=[t.id for t in s_tags if t.id is not None],
-                can_view_18plus=can_view_18plus,
                 can_edit_tags=(s.author_id == user.id or has_privilege(user, "admin")))
 
 
@@ -1165,7 +1214,6 @@ def suggestion_set_tags(
     if not s:
         raise HTTPException(status_code=404)
     is_admin = has_privilege(user, "admin")
-    can_view_18plus = _user_can_view_18plus(session, user)
     if not (is_admin or s.author_id == user.id):
         raise HTTPException(status_code=403, detail="Not allowed")
 
@@ -1175,7 +1223,7 @@ def suggestion_set_tags(
     suggestion_corner_id = suggestion_corner.id if suggestion_corner else None
     allowed = [
         t for t in tags
-        if _tag_selectable_for_user(user, t, is_admin, can_view_18plus)
+        if _tag_selectable_for_user(session, user, t, is_admin)
         and t.id is not None
         and _tag_allowed_in_corner(session, t.id, suggestion_corner_id)
     ]
@@ -1239,16 +1287,15 @@ def generic_corner_list(
             select(Post).where(Post.corner_id == corner.id, Post.is_approved == is_approved)
         ).all()
         all_corner_tags = _available_tags_for_corner(session, corner.id)
-        can_view_18plus = _user_can_view_18plus(session, user)
-        tag = _sanitize_tag_query_for_user(user, tag, all_corner_tags, can_view_18plus)
-        available_tags = _filter_tags_visible_for_user(user, all_corner_tags, can_view_18plus)
+        tag = _sanitize_tag_query_for_user(session, user, tag, all_corner_tags)
+        available_tags = _filter_tags_visible_for_user(session, user, all_corner_tags)
         post_ids = [p.id for p in posts if p.id is not None]
         tags_by_post = _load_tags_for_posts(session, post_ids)
         posts = [
             p for p in posts
             if p.id is not None
             and (not tag or any((t.slug == tag or t.name == tag) for t in tags_by_post.get(p.id, [])))
-            and _tags_visible_for_user(user, tags_by_post.get(p.id, []), can_view_18plus)
+            and _tags_visible_for_user(session, user, tags_by_post.get(p.id, []))
         ]
         scored = []
         authors: dict[int, User] = {}
@@ -1273,16 +1320,15 @@ def generic_corner_list(
             select(Post).where(Post.corner_id == corner.id).order_by(Post.created_at.desc())
         ).all()
         all_corner_tags = _available_tags_for_corner(session, corner.id)
-        can_view_18plus = _user_can_view_18plus(session, user)
-        tag = _sanitize_tag_query_for_user(user, tag, all_corner_tags, can_view_18plus)
-        available_tags = _filter_tags_visible_for_user(user, all_corner_tags, can_view_18plus)
+        tag = _sanitize_tag_query_for_user(session, user, tag, all_corner_tags)
+        available_tags = _filter_tags_visible_for_user(session, user, all_corner_tags)
         post_ids = [p.id for p in posts if p.id is not None]
         tags_by_post = _load_tags_for_posts(session, post_ids)
         posts = [
             p for p in posts
             if p.id is not None
             and (not tag or any((t.slug == tag or t.name == tag) for t in tags_by_post.get(p.id, [])))
-            and _tags_visible_for_user(user, tags_by_post.get(p.id, []), can_view_18plus)
+            and _tags_visible_for_user(session, user, tags_by_post.get(p.id, []))
         ]
         authors: dict[int, User] = {}
         for p in posts:
@@ -1300,8 +1346,7 @@ def generic_write_page(slug: str, request: Request, user: User = Depends(get_cur
     if not corner:
         raise HTTPException(status_code=404)
     tags = _available_tags_for_corner(session, corner.id)
-    can_view_18plus = _user_can_view_18plus(session, user)
-    return _tpl("generic_write.html", request, session, user, corner=corner, tags=tags, can_view_18plus=can_view_18plus)
+    return _tpl("generic_write.html", request, session, user, corner=corner, tags=tags)
 
 
 @app.post("/corners/{slug}/write", response_class=HTMLResponse)
@@ -1322,11 +1367,10 @@ def generic_write(
     session.add(post)
     session.commit()
     if tag_ids:
-        can_view_18plus = _user_can_view_18plus(session, user)
         is_admin = has_privilege(user, "admin")
         tags = session.exec(select(Tag).where(Tag.id.in_(tag_ids))).all()  # type: ignore[attr-defined]
         for t in tags:
-            if _tag_selectable_for_user(user, t, is_admin, can_view_18plus) and _tag_allowed_in_corner(session, t.id, corner.id):
+            if _tag_selectable_for_user(session, user, t, is_admin) and _tag_allowed_in_corner(session, t.id, corner.id):
                 session.add(PostTag(post_id=post.id, tag_id=t.id))
         session.commit()
     _notify_followers(session, user.id, f"{user.username} published in {corner.name}: {post.title}")
@@ -1346,10 +1390,9 @@ def generic_detail(
     if not post or post.corner_id != corner.id:
         raise HTTPException(status_code=404)
 
-    can_view_18plus = _user_can_view_18plus(session, user)
     tags_by_post = _load_tags_for_posts(session, [post.id]) if post.id is not None else {}
     post_tags = tags_by_post.get(post.id, []) if post.id is not None else []
-    if not _tags_visible_for_user(user, post_tags, can_view_18plus):
+    if not _tags_visible_for_user(session, user, post_tags):
         raise HTTPException(status_code=403, detail="You cannot view this post.")
 
     if corner.template_type == "library" and post.author_id != user.id:
@@ -1376,7 +1419,6 @@ def generic_detail(
                 all_tags=all_tags, post_tags=post_tags,
                 post_tag_ids=[t.id for t in post_tags if t.id is not None],
                 can_edit_tags=(post.author_id == user.id or has_privilege(user, "admin")),
-                can_view_18plus=can_view_18plus,
                 **extra)
 
 
@@ -1396,7 +1438,6 @@ def post_set_tags(
         raise HTTPException(status_code=404)
 
     is_admin = has_privilege(user, "admin")
-    can_view_18plus = _user_can_view_18plus(session, user)
     if not (is_admin or post.author_id == user.id):
         raise HTTPException(status_code=403, detail="Not allowed")
 
@@ -1404,7 +1445,7 @@ def post_set_tags(
     tags = session.exec(select(Tag).where(Tag.id.in_(tag_ids))).all() if tag_ids else []
     allowed = [
         t for t in tags
-        if _tag_selectable_for_user(user, t, is_admin, can_view_18plus)
+        if _tag_selectable_for_user(session, user, t, is_admin)
         and t.id is not None
         and _tag_allowed_in_corner(session, t.id, corner.id)
     ]
@@ -1554,10 +1595,9 @@ def user_profile(username: str, request: Request, user: User = Depends(get_curre
     if not profile:
         raise HTTPException(status_code=404)
     books = session.exec(select(Book).where(Book.author_id == profile.id).order_by(Book.created_at.desc())).all()
-    can_view_18plus = _user_can_view_18plus(session, user)
     book_ids = [b.id for b in books if b.id is not None]
     tags_by_book = _load_tags_for_books(session, book_ids)
-    books = [b for b in books if b.id is not None and _tags_visible_for_user(user, tags_by_book.get(b.id, []), can_view_18plus)]
+    books = [b for b in books if b.id is not None and _tags_visible_for_user(session, user, tags_by_book.get(b.id, []))]
     total_views = sum(b.views for b in books)
     ss = _suggestion_stats(session, profile.id, viewer=user)
     titles = session.exec(select(Title).where(Title.user_id == profile.id).order_by(Title.created_at)).all()
@@ -1571,12 +1611,12 @@ def user_profile(username: str, request: Request, user: User = Depends(get_curre
     all_badges = session.exec(select(Badge).order_by(Badge.name)).all()
     ub_rows = session.exec(select(UserBadge).where(UserBadge.user_id == profile.id)).all()
     profile_badges = []
-    user_badge_ids = set()
+    profile_badge_ids = set()
     for ub in ub_rows:
         b = session.get(Badge, ub.badge_id)
         if b:
             profile_badges.append(b)
-            user_badge_ids.add(b.id)
+            profile_badge_ids.add(b.id)
     profile_has_privileges = _user_has_any_privilege(profile)
     followers_count = session.exec(
         select(sa_func.count()).select_from(Follow).where(Follow.following_id == profile.id)
@@ -1599,13 +1639,32 @@ def user_profile(username: str, request: Request, user: User = Depends(get_curre
             continue
         profile_externals.append(c)
     profile_externals.sort(key=lambda x: (x.name or "").lower())
+    can_edit_bio = profile.id == user.id or has_privilege(user, "admin")
     return _tpl("user_profile.html", request, session, user,
                 profile=profile, books=books, total_views=total_views, titles=titles,
                 corner_stats=cstats, all_saved_titles=all_saved_titles,
                 all_badges=all_badges, profile_badges=profile_badges,
-                user_badge_ids=user_badge_ids, profile_has_privileges=profile_has_privileges,
+                profile_badge_ids=profile_badge_ids, profile_has_privileges=profile_has_privileges,
                 followers_count=followers_count, following_count=following_count, is_following=is_following,
-                profile_externals=profile_externals, **ss)
+                profile_externals=profile_externals, can_edit_bio=can_edit_bio, **ss)
+
+
+@app.post("/user/{username}/bio", response_class=HTMLResponse)
+def update_profile_bio(
+    username: str,
+    bio: str = Form("", max_length=500),
+    user: User = Depends(get_current_user),
+    session: Session = Depends(get_session),
+):
+    profile = session.exec(select(User).where(User.username == username)).first()
+    if not profile:
+        raise HTTPException(status_code=404)
+    if profile.id != user.id and not has_privilege(user, "admin"):
+        raise HTTPException(status_code=403, detail="Not allowed")
+    profile.bio = (bio or "").strip()[:500]
+    session.add(profile)
+    session.commit()
+    return RedirectResponse(url=f"/user/{profile.username}", status_code=status.HTTP_303_SEE_OTHER)
 
 
 @app.post("/user/{username}/follow")
@@ -1699,10 +1758,9 @@ def user_logs(username: str, request: Request, user: User = Depends(get_current_
 @app.get("/dashboard", response_class=HTMLResponse)
 def dashboard(request: Request, user: User = Depends(get_current_user), session: Session = Depends(get_session)):
     books = session.exec(select(Book).where(Book.author_id == user.id).order_by(Book.created_at.desc())).all()
-    can_view_18plus = _user_can_view_18plus(session, user)
     book_ids = [b.id for b in books if b.id is not None]
     tags_by_book = _load_tags_for_books(session, book_ids)
-    books = [b for b in books if b.id is not None and _tags_visible_for_user(user, tags_by_book.get(b.id, []), can_view_18plus)]
+    books = [b for b in books if b.id is not None and _tags_visible_for_user(session, user, tags_by_book.get(b.id, []))]
     total_views = sum(b.views for b in books)
     ss = _suggestion_stats(session, user.id, viewer=user)
     titles = session.exec(select(Title).where(Title.user_id == user.id).order_by(Title.created_at)).all()
@@ -1720,9 +1778,16 @@ def dashboard(request: Request, user: User = Depends(get_current_user), session:
         b = session.get(Badge, ub.badge_id)
         if b:
             my_badges.append(b)
+    followers_count = session.exec(
+        select(sa_func.count()).select_from(Follow).where(Follow.following_id == user.id)
+    ).one()
+    following_count = session.exec(
+        select(sa_func.count()).select_from(Follow).where(Follow.follower_id == user.id)
+    ).one()
     return _tpl("dashboard.html", request, session, user,
                 books=books, total_views=total_views, titles=titles,
-                corner_stats=cstats, saved_externals=saved_externals, my_badges=my_badges, **ss)
+                corner_stats=cstats, saved_externals=saved_externals, my_badges=my_badges,
+                followers_count=followers_count, following_count=following_count, **ss)
 
 
 @app.get("/notifications", response_class=HTMLResponse)
@@ -1758,7 +1823,6 @@ def admin_panel(
     admin: User = Depends(get_current_admin), session: Session = Depends(get_session),
 ):
     pending = session.exec(select(User).where(User.is_active == False, User.rank < 11, User.is_deleted == False)).all()
-    banned = session.exec(select(User).where(User.is_banned == True, User.is_deleted == False)).all()
     pending_suggestions = session.exec(select(Suggestion).where(Suggestion.is_approved == False)).all()
     s_authors: dict[int, User] = {}
     for s in pending_suggestions:
@@ -1793,7 +1857,7 @@ def admin_panel(
                 external_counts[sub.corner_id] += 1
 
     return _tpl("admin.html", request, session, admin, queued=bool(queued),
-                pending_users=pending, banned_users=banned,
+                pending_users=pending,
                 pending_suggestions=pending_suggestions, s_authors=s_authors,
                 pending_actions=pending_actions, a_admins=a_admins,
                 action_summaries=action_summaries, corners=all_corners,
@@ -2171,10 +2235,31 @@ def delete_badge(badge_id: int, admin: User = Depends(get_current_admin), sessio
     return RedirectResponse(url="/admin/badges", status_code=status.HTTP_303_SEE_OTHER)
 
 
+def _validated_tag_fields(
+    session: Session, tag_type: str, min_rank: int, required_badge_id_str: str | None
+) -> tuple[str, int, int | None]:
+    tt = (tag_type or "normal").strip().lower().replace("-", "_")
+    legacy = {"illegal": "rank_gated", "18plus": "badge_gated"}
+    tt = legacy.get(tt, tt)
+    if tt not in ("normal", "rank_gated", "badge_gated"):
+        raise HTTPException(status_code=400, detail="Invalid tag type")
+    mr = max(1, min(12, int(min_rank))) if tt == "rank_gated" else 1
+    req_badge: int | None = None
+    if tt == "badge_gated":
+        raw = (required_badge_id_str or "").strip()
+        if not raw:
+            raise HTTPException(status_code=400, detail="Badge-gated tags require a badge")
+        req_badge = int(raw)
+        if not session.get(Badge, req_badge):
+            raise HTTPException(status_code=400, detail="Invalid badge")
+    return tt, mr, req_badge
+
+
 @app.get("/admin/tags", response_class=HTMLResponse)
 def admin_tags_page(request: Request, admin: User = Depends(get_current_admin), session: Session = Depends(get_session)):
     tags = session.exec(select(Tag).order_by(Tag.created_at.desc())).all()
     corners = session.exec(select(Corner).order_by(Corner.created_at)).all()
+    badges = session.exec(select(Badge).order_by(Badge.name)).all()
     tag_corner_map: dict[int, list[Corner]] = {}
     accesses = session.exec(select(TagCornerAccess)).all()
     for tag in tags:
@@ -2182,7 +2267,10 @@ def admin_tags_page(request: Request, admin: User = Depends(get_current_admin), 
             continue
         cids = [a.corner_id for a in accesses if a.tag_id == tag.id]
         tag_corner_map[tag.id] = [c for c in corners if c.id in cids]
-    return _tpl("admin_tags.html", request, session, admin, tags=tags, corners=corners, tag_corner_map=tag_corner_map)
+    return _tpl(
+        "admin_tags.html", request, session, admin,
+        tags=tags, corners=corners, badges=badges, tag_corner_map=tag_corner_map,
+    )
 
 
 @app.post("/admin/tags/create")
@@ -2191,20 +2279,16 @@ def create_tag(
     slug: str = Form(..., min_length=1, max_length=60),
     tag_type: str = Form("normal"),
     min_rank: int = Form(5),
+    required_badge_id: str | None = Form(default=None),
     corner_ids: list[int] | None = Form(default=None),
     admin: User = Depends(get_current_admin),
     session: Session = Depends(get_session),
 ):
     slug = slug.strip().lower()
-    if tag_type not in ("normal", "illegal", "18plus"):
-        raise HTTPException(status_code=400, detail="Invalid tag type")
-    if tag_type == "illegal":
-        min_rank = max(1, min(12, int(min_rank)))
-    else:
-        min_rank = 1
     if session.exec(select(Tag).where(Tag.slug == slug)).first():
         raise HTTPException(status_code=400, detail="Tag slug already exists")
-    tag = Tag(name=name.strip(), slug=slug, tag_type=tag_type, min_rank=min_rank)
+    tt, mr, rb = _validated_tag_fields(session, tag_type, min_rank, required_badge_id)
+    tag = Tag(name=name.strip(), slug=slug, tag_type=tt, min_rank=mr, required_badge_id=rb)
     session.add(tag)
     session.commit()
     if corner_ids:
@@ -2212,6 +2296,27 @@ def create_tag(
             if session.get(Corner, cid):
                 session.add(TagCornerAccess(tag_id=tag.id, corner_id=cid))
         session.commit()
+    return RedirectResponse(url="/admin/tags", status_code=status.HTTP_303_SEE_OTHER)
+
+
+@app.post("/admin/tags/{tag_id}/update")
+def admin_update_tag(
+    tag_id: int,
+    tag_type: str = Form(...),
+    min_rank: int = Form(1),
+    required_badge_id: str | None = Form(default=None),
+    admin: User = Depends(get_current_admin),
+    session: Session = Depends(get_session),
+):
+    tag = session.get(Tag, tag_id)
+    if not tag:
+        raise HTTPException(status_code=404)
+    tt, mr, rb = _validated_tag_fields(session, tag_type, min_rank, required_badge_id)
+    tag.tag_type = tt
+    tag.min_rank = mr
+    tag.required_badge_id = rb
+    session.add(tag)
+    session.commit()
     return RedirectResponse(url="/admin/tags", status_code=status.HTTP_303_SEE_OTHER)
 
 

@@ -9,6 +9,10 @@
 .badge-admin { background: var(--primary-faint); color: var(--primary); }
 .badge-banned { background: var(--danger-bg); color: var(--danger); }
 .profile-bio { color: var(--text-muted); font-size: .9rem; line-height: 1.5; margin-bottom: .5rem; }
+.profile-bio-form { margin-bottom: .65rem; }
+.profile-bio-form textarea { width: 100%; margin-bottom: .45rem; font-size: .88rem; line-height: 1.45; min-height: 5.5rem; resize: vertical; }
+.profile-bio-form .hint { font-size: .72rem; color: var(--text-faint); margin: 0 0 .4rem; }
+.visually-hidden { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0,0,0,0); white-space: nowrap; border: 0; }
 .profile-meta { font-size: .78rem; color: var(--text-faint); margin-bottom: 1rem; }
 .titles-row { margin-bottom: .75rem; }
 .item-row { display: flex; justify-content: space-between; align-items: center; padding: .6rem 0; border-bottom: 1px solid var(--border-light); }
@@ -203,7 +207,14 @@
     </div>
     {% endif %}
 
-    {% if profile.bio %}
+    {% if can_edit_bio %}
+    <form method="post" action="/user/{{ profile.username }}/bio" class="profile-bio-form">
+      <label for="profile-bio" class="visually-hidden">Bio</label>
+      <textarea id="profile-bio" name="bio" maxlength="500" rows="4" placeholder="Short bio (visible on your profile)">{{ profile.bio }}</textarea>
+      <p class="hint">Up to 500 characters. {% if profile.id != user.id %}You are editing this user’s bio as an admin.{% endif %}</p>
+      <button type="submit" class="btn btn-primary btn-sm">Save bio</button>
+    </form>
+    {% elif profile.bio %}
     <p class="profile-bio">{{ profile.bio }}</p>
     {% else %}
     <p class="profile-bio" style="font-style:italic;">No bio provided.</p>
@@ -218,10 +229,8 @@
       <div class="stat-box"><div class="num">{{ s_up }}</div><div class="label">Upvotes</div></div>
       <div class="stat-box"><div class="num">{{ s_down }}</div><div class="label">Downvotes</div></div>
       <div class="stat-box"><div class="num">{{ s_approved }}</div><div class="label">Approved</div></div>
-      {% if profile.id != user.id %}
       <div class="stat-box"><div class="num">{{ followers_count }}</div><div class="label">Followers</div></div>
       <div class="stat-box"><div class="num">{{ following_count }}</div><div class="label">Following</div></div>
-      {% endif %}
     </div>
 
     {% if books %}
@@ -309,7 +318,7 @@
         {% for badge in all_badges %}
         <form method="post" action="/admin/badge/toggle/{{ profile.id }}" style="margin:0;">
           <input type="hidden" name="badge_id" value="{{ badge.id }}">
-          <button type="submit" class="badge-toggle {{ 'active' if badge.id in user_badge_ids else '' }}">
+          <button type="submit" class="badge-toggle {{ 'active' if badge.id in profile_badge_ids else '' }}">
             <span class="btgl-icon">{{ badge.icon_svg|safe }}</span>
             {{ badge.name }}
           </button>

@@ -2,7 +2,13 @@
 {% block title %}Write a Book — InnerCircle{% endblock %}
 
 {% block extra_css %}
-textarea.content-area { min-height: 280px; }
+textarea.content-area {
+  min-height: min(70vh, 36rem);
+  line-height: 1.55;
+  font-size: .9rem;
+  resize: vertical;
+  font-family: inherit;
+}
 {% endblock %}
 
 {% block body %}
@@ -20,16 +26,18 @@ textarea.content-area { min-height: 280px; }
 
       <label for="content">Content</label>
       <textarea id="content" name="content" class="content-area" required placeholder="Share your knowledge..."></textarea>
-      <p class="text-muted text-sm" style="margin-top:.35rem;">Put <code>---page---</code> on its own line to split pages (works on Windows/Mac/Linux line endings).</p>
+      <p class="text-muted text-sm" style="margin-top:.35rem;">Put <code>---page---</code> on its own line to split pages (works on Windows/Mac/Linux line endings). Long manuscripts stay readable in the editor—resize the box as needed.</p>
 
       {% if tags %}
       <div style="margin-top:1rem;">
         <label style="margin-bottom:.35rem;">Tags</label>
         <div style="display:flex; flex-wrap:wrap; gap:.5rem; margin-bottom:1rem;">
           {% for t in tags %}
-            {% set can_select_illegal = has_privilege(user, 'admin') or user.rank >= t.min_rank %}
-            {% set can_select_18plus = has_privilege(user, 'admin') or can_view_18plus %}
-            {% if (t.tag_type == 'illegal' and not can_select_illegal) or (t.tag_type == '18plus' and not can_select_18plus) %}
+            {% set locked = false %}
+            {% if t.tag_type in ('illegal', 'rank_gated') and not (has_privilege(user, 'admin') or user.rank >= t.min_rank) %}{% set locked = true %}{% endif %}
+            {% if t.tag_type == '18plus' and not (has_privilege(user, 'admin') or can_view_18plus) %}{% set locked = true %}{% endif %}
+            {% if t.tag_type == 'badge_gated' and not (has_privilege(user, 'admin') or (t.required_badge_id and t.required_badge_id in user_badge_ids)) %}{% set locked = true %}{% endif %}
+            {% if locked %}
               <label style="opacity:.55; display:flex; align-items:center; gap:.4rem; font-size:.85rem;">
                 <input type="checkbox" disabled>
                 {{ t.name }}

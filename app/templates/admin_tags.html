@@ -2,18 +2,24 @@
 {% block title %}Manage Tags — InnerCircle{% endblock %}
 
 {% block extra_css %}
-.tag-row { background: var(--bg-card); border-radius: 10px; box-shadow: var(--shadow); padding: 1rem 1.25rem; margin-bottom: .75rem; display: flex; justify-content: space-between; align-items: center; gap: 1rem; flex-wrap: wrap; }
+.tag-row { background: var(--bg-card); border-radius: 10px; box-shadow: var(--shadow); padding: 1rem 1.25rem; margin-bottom: .75rem; display: flex; flex-direction: column; gap: .85rem; }
+.tag-row .top { display: flex; justify-content: space-between; align-items: flex-start; gap: 1rem; flex-wrap: wrap; }
 .tag-row .info { flex: 1; min-width: 0; }
 .tag-name { font-weight: 700; }
-.tag-meta { font-size: .78rem; color: var(--text-muted); margin-top: .15rem; }
+.tag-meta { font-size: .78rem; color: var(--text-muted); margin-top: .15rem; line-height: 1.4; }
 .pill { display: inline-block; font-size: .68rem; padding: .15rem .45rem; border-radius: 6px; font-weight: 700; margin-right: .35rem; }
-.pill-illegal { background: rgba(185, 28, 28, .1); color: var(--danger); }
-.pill-18plus { background: rgba(79, 70, 229, .12); color: var(--primary); }
+.pill-rank { background: rgba(185, 28, 28, .1); color: var(--danger); }
+.pill-badge { background: rgba(79, 70, 229, .12); color: var(--primary); }
+.pill-normal { background: var(--primary-faint); color: var(--text-muted); }
 .rank-help { font-size: .74rem; color: var(--text-muted); margin-top: .25rem; line-height: 1.35; }
+.tag-update-form { padding-top: .75rem; border-top: 1px solid var(--border-light); }
+.tag-update-form .row { display: flex; flex-wrap: wrap; gap: .65rem; align-items: flex-end; margin-bottom: .5rem; }
+.tag-update-form label { font-size: .78rem; margin-bottom: .2rem; display: block; }
+.tag-update-form select, .tag-update-form input[type="number"] { font-size: .82rem; padding: .35rem .5rem; margin-bottom: 0; }
 {% endblock %}
 
 {% block body %}
-<div class="container" style="max-width:620px;">
+<div class="container" style="max-width:640px;">
   <div class="flex justify-between items-center" style="margin-bottom:1.25rem;">
     <h2 style="font-size:1.3rem;">Manage Tags</h2>
     <a href="/admin" class="btn btn-ghost btn-sm">Back to Admin</a>
@@ -21,24 +27,35 @@
 
   <div class="card mb-2">
     <h3 style="font-size:.95rem; font-weight:700; margin-bottom:.75rem;">Create New Tag</h3>
-    <form method="post" action="/admin/tags/create">
+    <form method="post" action="/admin/tags/create" id="createTagForm">
       <label>Name</label>
-      <input type="text" name="name" maxlength="100" required placeholder="e.g. Illegal">
+      <input type="text" name="name" maxlength="100" required placeholder="e.g. Mature themes">
 
       <label>Slug (stable id)</label>
-      <input type="text" name="slug" maxlength="60" required placeholder="e.g. illegal">
+      <input type="text" name="slug" maxlength="60" required placeholder="e.g. mature">
 
       <label>Type</label>
-      <select name="tag_type" required style="margin-bottom:.85rem;">
+      <select name="tag_type" id="createTagType" required style="margin-bottom:.85rem;">
         <option value="normal">Normal</option>
-        <option value="illegal">Illegal (rank-gated)</option>
-        <option value="18plus">18+ (badge-gated)</option>
+        <option value="rank_gated">Rank-Gated</option>
+        <option value="badge_gated">Badge-Gated</option>
       </select>
 
-      <div id="illegal-min-rank-wrap" style="margin-top:.5rem;">
-        <label>Min Rank for Illegal</label>
-        <input type="number" name="min_rank" min="1" max="12" value="5" style="margin-bottom:0;">
-        <p class="rank-help">Only used when tag type is <strong>Illegal</strong>. Example: 5 means rank 5+ can tag and view it.</p>
+      <div id="createRankWrap" style="display:none; margin-top:.5rem;">
+        <label>Minimum rank</label>
+        <input type="number" name="min_rank" id="createMinRank" min="1" max="12" value="5" style="margin-bottom:0;">
+        <p class="rank-help">Users at this rank or higher can apply and view content with this tag.</p>
+      </div>
+
+      <div id="createBadgeWrap" style="display:none; margin-top:.5rem;">
+        <label>Required badge</label>
+        <select name="required_badge_id" id="createBadgeId" style="margin-bottom:0;">
+          <option value="">— choose badge —</option>
+          {% for b in badges %}
+          <option value="{{ b.id }}">{{ b.name }}</option>
+          {% endfor %}
+        </select>
+        <p class="rank-help">Only users assigned this badge can apply and view this tag.</p>
       </div>
 
       <div style="margin-top:1rem;">
@@ -60,29 +77,66 @@
   {% if tags %}
     {% for t in tags %}
       <div class="tag-row">
-        <div class="info">
-          <div class="tag-name">
-            {% if t.tag_type == 'illegal' %}
-              <span class="pill pill-illegal">Illegal</span>
-            {% elif t.tag_type == '18plus' %}
-              <span class="pill pill-18plus">18+</span>
-            {% endif %}
-            {{ t.name }}
+        <div class="top">
+          <div class="info">
+            <div class="tag-name">
+              {% if t.tag_type in ('illegal', 'rank_gated') %}
+                <span class="pill pill-rank">Rank-Gated</span>
+              {% elif t.tag_type in ('18plus', 'badge_gated') %}
+                <span class="pill pill-badge">Badge-Gated</span>
+              {% else %}
+                <span class="pill pill-normal">Normal</span>
+              {% endif %}
+              {{ t.name }}
+            </div>
+            <div class="tag-meta">/{{ t.slug }}
+              {% if t.tag_type in ('illegal', 'rank_gated') %} &middot; min rank {{ t.min_rank }}{% endif %}
+              {% if t.tag_type in ('18plus', 'badge_gated') and t.required_badge_id %}
+                {% for b in badges %}
+                  {% if b.id == t.required_badge_id %} &middot; badge: {{ b.name }}{% endif %}
+                {% endfor %}
+              {% endif %}
+            </div>
+            <div class="tag-meta" style="margin-top:.25rem;">
+              {% if t.id in tag_corner_map and tag_corner_map[t.id] %}
+                corners:
+                {% for c in tag_corner_map[t.id] %}
+                  {{ c.name }}{% if not loop.last %}, {% endif %}
+                {% endfor %}
+              {% else %}
+                corners: all
+              {% endif %}
+            </div>
           </div>
-          <div class="tag-meta">/{{ t.slug }} &middot; {{ t.tag_type }}{% if t.tag_type == 'illegal' %} &middot; min rank {{ t.min_rank }}{% endif %}</div>
-          <div class="tag-meta" style="margin-top:.25rem;">
-            {% if t.id in tag_corner_map and tag_corner_map[t.id] %}
-              corners:
-              {% for c in tag_corner_map[t.id] %}
-                {{ c.name }}{% if not loop.last %}, {% endif %}
-              {% endfor %}
-            {% else %}
-              corners: all
-            {% endif %}
-          </div>
+          <form method="post" action="/admin/tags/{{ t.id }}/delete" style="margin:0;">
+            <button class="btn btn-danger btn-sm" type="submit" onclick="return confirm('Delete this tag? It will be removed from all posts.')" style="white-space:nowrap;">Delete</button>
+          </form>
         </div>
-        <form method="post" action="/admin/tags/{{ t.id }}/delete" style="margin:0;">
-          <button class="btn btn-danger btn-sm" type="submit" onclick="return confirm('Delete this tag? It will be removed from all posts.')" style="white-space:nowrap;">Delete</button>
+        <form method="post" action="/admin/tags/{{ t.id }}/update" class="tag-update-form tag-update-{{ t.id }}">
+          <div class="row">
+            <div>
+              <label>Type</label>
+              <select name="tag_type" class="upd-type" data-tagid="{{ t.id }}">
+                <option value="normal" {{ 'selected' if t.tag_type == 'normal' else '' }}>Normal</option>
+                <option value="rank_gated" {{ 'selected' if t.tag_type in ('illegal', 'rank_gated') else '' }}>Rank-Gated</option>
+                <option value="badge_gated" {{ 'selected' if t.tag_type in ('18plus', 'badge_gated') else '' }}>Badge-Gated</option>
+              </select>
+            </div>
+            <div class="upd-rank-wrap" data-tagid="{{ t.id }}" style="display: {{ 'block' if t.tag_type in ('illegal', 'rank_gated') else 'none' }};">
+              <label>Min rank</label>
+              <input type="number" name="min_rank" min="1" max="12" value="{{ t.min_rank }}" style="width:5rem;">
+            </div>
+            <div class="upd-badge-wrap" data-tagid="{{ t.id }}" style="display: {{ 'block' if t.tag_type in ('18plus', 'badge_gated') else 'none' }};">
+              <label>Badge</label>
+              <select name="required_badge_id" class="upd-badge-select" style="min-width:10rem;">
+                <option value="">— required —</option>
+                {% for b in badges %}
+                <option value="{{ b.id }}" {{ 'selected' if t.required_badge_id == b.id else '' }}>{{ b.name }}</option>
+                {% endfor %}
+              </select>
+            </div>
+            <button class="btn btn-ghost btn-sm" type="submit" style="margin-bottom:2px;">Save</button>
+          </div>
         </form>
       </div>
     {% endfor %}
@@ -92,17 +146,50 @@
 </div>
 <script>
   (function () {
-    var typeSelect = document.querySelector('select[name="tag_type"]');
-    var minRankWrap = document.getElementById('illegal-min-rank-wrap');
-    function refreshMinRankVisibility() {
-      if (!typeSelect || !minRankWrap) return;
-      minRankWrap.style.display = typeSelect.value === 'illegal' ? 'block' : 'none';
+    function syncCreate() {
+      var sel = document.getElementById('createTagType');
+      var rw = document.getElementById('createRankWrap');
+      var bw = document.getElementById('createBadgeWrap');
+      var badgeSel = document.getElementById('createBadgeId');
+      if (!sel || !rw || !bw) return;
+      var v = sel.value;
+      rw.style.display = v === 'rank_gated' ? 'block' : 'none';
+      bw.style.display = v === 'badge_gated' ? 'block' : 'none';
+      if (badgeSel) badgeSel.required = v === 'badge_gated';
     }
-    if (typeSelect) {
-      typeSelect.addEventListener('change', refreshMinRankVisibility);
-      refreshMinRankVisibility();
+    var cform = document.getElementById('createTagForm');
+    var ctype = document.getElementById('createTagType');
+    if (ctype) {
+      ctype.addEventListener('change', syncCreate);
+      syncCreate();
     }
+    if (cform) {
+      cform.addEventListener('submit', function (e) {
+        if (ctype && ctype.value === 'badge_gated') {
+          var b = document.getElementById('createBadgeId');
+          if (!b || !b.value) { e.preventDefault(); alert('Choose a badge for badge-gated tags.'); }
+        }
+      });
+    }
+    document.querySelectorAll('.upd-type').forEach(function (sel) {
+      function syncRow() {
+        var id = sel.getAttribute('data-tagid');
+        var v = sel.value;
+        document.querySelectorAll('.upd-rank-wrap[data-tagid="' + id + '"]').forEach(function (el) {
+          el.style.display = v === 'rank_gated' ? 'block' : 'none';
+        });
+        document.querySelectorAll('.upd-badge-wrap[data-tagid="' + id + '"]').forEach(function (el) {
+          el.style.display = v === 'badge_gated' ? 'block' : 'none';
+        });
+        var form = sel.closest('form');
+        if (form) {
+          var bs = form.querySelector('.upd-badge-select');
+          if (bs) bs.required = v === 'badge_gated';
+        }
+      }
+      sel.addEventListener('change', syncRow);
+      syncRow();
+    });
   })();
 </script>
 {% endblock %}
-

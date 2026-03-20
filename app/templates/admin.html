@@ -141,29 +141,6 @@
   </div>
 
   <div class="section">
-    <h2>Banned Users</h2>
-    {% if banned_users %}
-      {% for u in banned_users %}
-      <div class="row">
-        <div class="info">
-          <div class="name">
-            <a href="/user/{{ u.username }}">{{ u.username }}{% if u.is_deleted %} Deleted{% endif %}</a>
-          </div>
-          <div class="detail">Banned &middot; joined {{ u.created_at.strftime('%Y-%m-%d') }}</div>
-        </div>
-        <div class="actions">
-          <form method="post" action="/admin/unban/{{ u.id }}" style="margin:0;">
-            <button class="btn btn-ghost btn-sm" type="submit">Unban</button>
-          </form>
-        </div>
-      </div>
-      {% endfor %}
-    {% else %}
-    <p class="empty">No banned users.</p>
-    {% endif %}
-  </div>
-
-  <div class="section">
     <h2>Corners</h2>
 
     {% if corners %}

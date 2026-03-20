@@ -80,6 +80,7 @@ class Tag(SQLModel, table=True):
     slug: str = Field(unique=True, max_length=60)
     tag_type: str = Field(default="normal", max_length=20)
     min_rank: int = Field(default=1)
+    required_badge_id: int | None = Field(default=None, foreign_key="badge.id")
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
 

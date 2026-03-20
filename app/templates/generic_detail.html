@@ -56,9 +56,9 @@
       <div style="font-size:.8rem; font-weight:700; color:var(--text-muted); margin-bottom:.35rem;">Tags</div>
       <div style="display:flex; flex-wrap:wrap; gap:.45rem;">
         {% for t in post_tags %}
-          {% if t.tag_type == 'illegal' %}
+          {% if t.tag_type in ('illegal', 'rank_gated') %}
             <span class="title-badge" style="background:var(--danger-bg); color:var(--danger); border:1px solid var(--danger-border);">{{ t.name }}</span>
-          {% elif t.tag_type == '18plus' %}
+          {% elif t.tag_type in ('18plus', 'badge_gated') %}
             <span class="title-badge" style="background:rgba(79,70,229,.12); color:var(--primary); border:1px solid rgba(79,70,229,.2);">{{ t.name }}</span>
           {% else %}
             <span class="title-badge">{{ t.name }}</span>
@@ -77,18 +77,17 @@
           <div style="font-size:.8rem; font-weight:700; color:var(--text-muted); margin-bottom:.35rem;">Update Tags</div>
           <div style="display:flex; flex-wrap:wrap; gap:.5rem; margin-bottom:.75rem;">
             {% for t in all_tags %}
-              {% set can_select_illegal = has_privilege(user, 'admin') or user.rank >= t.min_rank %}
-              {% set disabled_illegal = (t.tag_type == 'illegal' and not can_select_illegal) %}
-              {% set can_select_18plus = has_privilege(user, 'admin') or can_view_18plus %}
-              {% set disabled_18plus = (t.tag_type == '18plus' and not can_select_18plus) %}
-              {% set disabled_tag = disabled_illegal or disabled_18plus %}
-              <label style="display:flex; align-items:center; gap:.4rem; opacity:{{ '0.55' if disabled_tag else '1' }};">
+              {% set locked = false %}
+              {% if t.tag_type in ('illegal', 'rank_gated') and not (has_privilege(user, 'admin') or user.rank >= t.min_rank) %}{% set locked = true %}{% endif %}
+              {% if t.tag_type == '18plus' and not (has_privilege(user, 'admin') or can_view_18plus) %}{% set locked = true %}{% endif %}
+              {% if t.tag_type == 'badge_gated' and not (has_privilege(user, 'admin') or (t.required_badge_id and t.required_badge_id in user_badge_ids)) %}{% set locked = true %}{% endif %}
+              <label style="display:flex; align-items:center; gap:.4rem; opacity:{{ '0.55' if locked else '1' }};">
                 <input
                   type="checkbox"
                   name="tag_ids"
                   value="{{ t.id }}"
                   {% if t.id in post_tag_ids %}checked{% endif %}
-                  {% if disabled_tag %}disabled{% endif %}
+                  {% if locked %}disabled{% endif %}
                 >
                 {{ t.name }}
               </label>

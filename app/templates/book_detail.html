@@ -2,71 +2,106 @@
 {% block title %}{{ book.title }} — InnerCircle{% endblock %}
 
 {% block extra_css %}
-.book-header { margin-bottom: 1.5rem; }
-.book-header h1 { font-size: 1.5rem; margin-bottom: .4rem; }
-.book-header .meta { font-size: .82rem; color: var(--text-muted); display: flex; gap: 1rem; flex-wrap: wrap; align-items: center; }
-.book-body { line-height: 1.7; font-size: .92rem; white-space: pre-wrap; word-wrap: break-word; }
-.book-actions-top { display: flex; flex-wrap: wrap; gap: .5rem; align-items: center; margin-bottom: .75rem; }
+.book-header { margin-bottom: 1.25rem; }
+.book-header h1 { font-size: 1.5rem; margin-bottom: .55rem; scroll-margin-top: 5rem; }
+.book-header-bar { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: .65rem; }
+.book-header-bar .meta { font-size: .82rem; color: var(--text-muted); display: flex; gap: 1rem; flex-wrap: wrap; align-items: center; flex: 1; min-width: 0; }
+.book-edit-link { font-size: .82rem; font-weight: 600; color: var(--primary); text-decoration: none; white-space: nowrap; padding: .35rem .5rem; border-radius: 6px; }
+.book-edit-link:hover { background: var(--primary-faint); text-decoration: none; }
+.book-read-column { max-width: 42rem; margin: 0 auto; padding: 0 .15rem 1rem; }
+.book-body {
+  line-height: 1.85;
+  font-size: .98rem;
+  white-space: pre-wrap;
+  word-wrap: break-word;
+  overflow-wrap: break-word;
+  hyphens: auto;
+  color: var(--text);
+}
+.book-sticky-read {
+  position: sticky;
+  bottom: 0.75rem;
+  z-index: 5;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: .5rem;
+  margin: 1.5rem auto 0;
+  max-width: 42rem;
+  padding: .65rem .85rem;
+  background: var(--bg-card);
+  border: 1px solid var(--border-light);
+  border-radius: 10px;
+  box-shadow: var(--shadow);
+}
+.book-sticky-read .pager-nav { display: flex; gap: .35rem; flex-wrap: wrap; align-items: center; }
+.book-sticky-read .pager-muted { font-size: .78rem; color: var(--text-muted); }
+.pager-disabled { opacity: .45; pointer-events: none; cursor: default; }
 .book-footer { margin-top: 2rem; padding-top: 1rem; border-top: 1px solid var(--border); display: flex; flex-direction: column; align-items: stretch; gap: 1rem; }
 .book-footer-row { display: flex; flex-wrap: wrap; gap: .5rem; align-items: center; }
-.book-pager { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: .5rem; margin-top: 1rem; }
-.book-pager .pager-muted { font-size: .8rem; color: var(--text-muted); }
-.book-pager .pager-nav { display: flex; gap: .35rem; flex-wrap: wrap; }
-.pager-disabled { opacity: .45; pointer-events: none; cursor: default; }
 @media (max-width: 520px) {
   .book-header h1 { font-size: 1.25rem; }
-  .book-actions-top .btn { font-size: .78rem; padding: .35rem .65rem; }
+  .book-body { font-size: .95rem; line-height: 1.8; }
+  .book-sticky-read { bottom: 0.5rem; padding: .55rem .65rem; }
 }
 {% endblock %}
 
 {% block body %}
-<div class="container" style="max-width:680px;">
+<div class="container" style="max-width:720px;">
   <div class="card">
     <div class="book-header">
-      <h1>{{ book.title }}</h1>
-      {% if can_edit_book %}
-      <div class="book-actions-top">
-        <a href="/corners/library/{{ book.id }}/edit" class="btn btn-ghost btn-sm">Edit book</a>
-      </div>
-      {% endif %}
-      <div class="meta">
-        <span>
-          by
-          <a href="/user/{{ author.username }}">
-            {{ author.username }}{% if author.is_deleted %} Deleted{% endif %}
-          </a>
-        </span>
-        <span>{{ book.views }} view{{ 's' if book.views != 1 else '' }}</span>
-        <span>Updated {{ book.updated_at.strftime('%B %d, %Y') }}</span>
+      <h1 id="book-top">{{ book.title }}</h1>
+      <div class="book-header-bar">
+        <div class="meta">
+          <span>
+            by
+            <a href="/user/{{ author.username }}">
+              {{ author.username }}{% if author.is_deleted %} Deleted{% endif %}
+            </a>
+          </span>
+          <span>{{ book.views }} view{{ 's' if book.views != 1 else '' }}</span>
+          <span>Updated {{ book.updated_at.strftime('%B %d, %Y') }}</span>
+        </div>
+        {% if can_edit_book %}
+        <a href="/corners/library/{{ book.id }}/edit" class="book-edit-link">Edit</a>
+        {% endif %}
       </div>
     </div>
-    <div class="book-body">{{ page_content }}</div>
-    {% if total_pages > 1 %}
-      <div class="book-pager">
-        <div class="pager-nav">
+
+    <div class="book-read-column">
+      <div class="book-body">{{ page_content }}</div>
+    </div>
+
+    <div class="book-sticky-read" role="navigation" aria-label="Book navigation">
+      <a href="/corners/library" class="btn btn-ghost btn-sm">← Library</a>
+      <div class="pager-nav">
+        {% if total_pages > 1 %}
           {% if current_page > 1 %}
             <a class="btn btn-ghost btn-sm" href="/corners/library/{{ book.id }}?page={{ current_page - 1 }}">Previous</a>
           {% else %}
             <span class="btn btn-ghost btn-sm pager-disabled">Previous</span>
           {% endif %}
+          <span class="pager-muted">Page {{ current_page }} / {{ total_pages }}</span>
           {% if current_page < total_pages %}
             <a class="btn btn-ghost btn-sm" href="/corners/library/{{ book.id }}?page={{ current_page + 1 }}">Next</a>
           {% else %}
             <span class="btn btn-ghost btn-sm pager-disabled">Next</span>
           {% endif %}
-        </div>
-        <span class="pager-muted">Page {{ current_page }} of {{ total_pages }}</span>
+        {% else %}
+          <a class="btn btn-ghost btn-sm" href="#book-top">↑ Top</a>
+        {% endif %}
       </div>
-    {% endif %}
+    </div>
 
     {% if book_tags and book_tags|length > 0 %}
     <div style="margin:.85rem 0;">
       <div style="font-size:.8rem; font-weight:700; color:var(--text-muted); margin-bottom:.35rem;">Tags</div>
       <div style="display:flex; flex-wrap:wrap; gap:.45rem;">
         {% for t in book_tags %}
-          {% if t.tag_type == 'illegal' %}
+          {% if t.tag_type in ('illegal', 'rank_gated') %}
             <span class="title-badge" style="background:var(--danger-bg); color:var(--danger); border:1px solid var(--danger-border);">{{ t.name }}</span>
-          {% elif t.tag_type == '18plus' %}
+          {% elif t.tag_type in ('18plus', 'badge_gated') %}
             <span class="title-badge" style="background:rgba(79,70,229,.12); color:var(--primary); border:1px solid rgba(79,70,229,.2);">{{ t.name }}</span>
           {% else %}
             <span class="title-badge">{{ t.name }}</span>
@@ -92,18 +127,17 @@
           <div style="font-size:.8rem; font-weight:700; color:var(--text-muted); margin-bottom:.35rem;">Update Tags</div>
           <div style="display:flex; flex-wrap:wrap; gap:.5rem; margin-bottom:.75rem;">
             {% for t in all_tags %}
-              {% set can_select_illegal = has_privilege(user, 'admin') or user.rank >= t.min_rank %}
-              {% set disabled_illegal = (t.tag_type == 'illegal' and not can_select_illegal) %}
-              {% set can_select_18plus = has_privilege(user, 'admin') or can_view_18plus %}
-              {% set disabled_18plus = (t.tag_type == '18plus' and not can_select_18plus) %}
-              {% set disabled_tag = disabled_illegal or disabled_18plus %}
-              <label style="display:flex; align-items:center; gap:.4rem; opacity:{{ '0.55' if disabled_tag else '1' }};">
+              {% set locked = false %}
+              {% if t.tag_type in ('illegal', 'rank_gated') and not (has_privilege(user, 'admin') or user.rank >= t.min_rank) %}{% set locked = true %}{% endif %}
+              {% if t.tag_type == '18plus' and not (has_privilege(user, 'admin') or can_view_18plus) %}{% set locked = true %}{% endif %}
+              {% if t.tag_type == 'badge_gated' and not (has_privilege(user, 'admin') or (t.required_badge_id and t.required_badge_id in user_badge_ids)) %}{% set locked = true %}{% endif %}
+              <label style="display:flex; align-items:center; gap:.4rem; opacity:{{ '0.55' if locked else '1' }};">
                 <input
                   type="checkbox"
                   name="tag_ids"
                   value="{{ t.id }}"
                   {% if t.id in book_tag_ids %}checked{% endif %}
-                  {% if disabled_tag %}disabled{% endif %}
+                  {% if locked %}disabled{% endif %}
                 >
                 {{ t.name }}
               </label>
