@@ -1,4 +1,5 @@
 import json
+import re
 from contextlib import asynccontextmanager
 from datetime import datetime, timezone
 from pathlib import Path
@@ -168,7 +169,8 @@ def _suggestion_stats(session: Session, user_id: int, viewer: User | None = None
 
 def _corner_stats(session: Session, user_id: int) -> list[dict]:
     corners = session.exec(select(Corner).where(
-        Corner.slug.notin_(["library", "suggestions"])  # type: ignore[attr-defined]
+        Corner.slug.notin_(["library", "suggestions"]),  # type: ignore[attr-defined]
+        Corner.is_external == False,
     ).order_by(Corner.created_at)).all()
     stats = []
     for corner in corners:
@@ -214,6 +216,25 @@ def _tag_visible_for_user(user: User, tag: Tag, can_view_18plus: bool) -> bool:
 
 def _tags_visible_for_user(user: User, tags: list[Tag], can_view_18plus: bool) -> bool:
     return all(_tag_visible_for_user(user, t, can_view_18plus) for t in tags)
+
+
+def _filter_tags_visible_for_user(user: User, tags: list[Tag], can_view_18plus: bool) -> list[Tag]:
+    return [t for t in tags if _tag_visible_for_user(user, t, can_view_18plus)]
+
+
+def _sanitize_tag_query_for_user(
+    user: User, tag: str | None, corner_tags: list[Tag], can_view_18plus: bool
+) -> str | None:
+    """Drop tag filter if it names a corner tag the user is not allowed to view."""
+    if not tag or not str(tag).strip():
+        return None
+    raw = str(tag).strip()
+    for t in corner_tags:
+        if t.slug == raw or t.name == raw:
+            if not _tag_visible_for_user(user, t, can_view_18plus):
+                return None
+            break
+    return raw
 
 
 def _tag_selectable_for_user(user: User, tag: Tag, is_admin: bool, can_view_18plus: bool) -> bool:
@@ -423,11 +444,31 @@ def _exec_approve_suggestion(session, p):
 def _exec_delete_book(session, p):
     b = session.get(Book, p["book_id"])
     if b:
+        for row in session.exec(select(BookTag).where(BookTag.book_id == b.id)).all():
+            session.delete(row)
+        for row in session.exec(select(BookPage).where(BookPage.book_id == b.id)).all():
+            session.delete(row)
         for c in session.exec(select(Comment).where(Comment.target_type == "book", Comment.target_id == b.id)).all():
             for r in session.exec(select(Comment).where(Comment.parent_id == c.id)).all():
                 session.delete(r)
             session.delete(c)
         session.delete(b)
+
+
+def _split_book_pages(raw: str) -> list[str]:
+    text = (raw or "").strip()
+    if not text:
+        return []
+    parts = re.split(r"\r?\n\s*---\s*page\s*---\s*\r?\n", text, flags=re.IGNORECASE)
+    chunks = [p.strip() for p in parts if p.strip()]
+    return chunks if chunks else [text]
+
+
+def _book_editor_content(session: Session, book: Book) -> str:
+    rows = session.exec(select(BookPage).where(BookPage.book_id == book.id).order_by(BookPage.page_number)).all()
+    if rows:
+        return "\n---page---\n".join(r.content for r in rows)
+    return book.content or ""
 
 
 def _exec_delete_suggestion(session, p):
@@ -561,6 +602,26 @@ def _action_summary(action_type: str, payload: dict, session: Session | None = N
         b = session.get(Badge, bid)
         return b.name if b else f"#{bid}"
 
+    def _safe_quote(s: str, max_len: int = 120) -> str:
+        t = (s or "").replace('"', "'").strip()
+        return t if len(t) <= max_len else t[: max_len - 1] + "…"
+
+    def _remove_title_line(tid):
+        if session is None or tid is None:
+            return f"Remove title #{tid}"
+        t = session.get(Title, tid)
+        if not t:
+            return f"Remove title #{tid}"
+        return f'Remove title "{_safe_quote(t.text)}" from {_user_name(t.user_id)}'
+
+    def _delete_book_line(bid):
+        if session is None or bid is None:
+            return f"Delete book #{bid}"
+        b = session.get(Book, bid)
+        if not b:
+            return f"Delete book #{bid}"
+        return f'Delete book "{_safe_quote(b.title, 100)}" by {_user_name(b.author_id)}'
+
     fns = {
         "approve_user": lambda p: f"Approve {_user_name(p.get('user_id'))}",
         "decline_user": lambda p: f"Decline {_user_name(p.get('user_id'))}",
@@ -568,10 +629,10 @@ def _action_summary(action_type: str, payload: dict, session: Session | None = N
         "unban_user": lambda p: f"Unban {_user_name(p.get('user_id'))}",
         "delete_user": lambda p: f"Delete {_user_name(p.get('user_id'))}",
         "approve_suggestion": lambda p: f"Approve suggestion #{p.get('suggestion_id')}",
-        "delete_book": lambda p: f"Delete book #{p.get('book_id')}",
+        "delete_book": lambda p: _delete_book_line(p.get("book_id")),
         "delete_suggestion": lambda p: f"Delete suggestion #{p.get('suggestion_id')}",
         "add_title": lambda p: f"Add title \"{p.get('text')}\" -> {_user_name(p.get('user_id'))}",
-        "remove_title": lambda p: f"Remove title #{p.get('title_id')}",
+        "remove_title": lambda p: _remove_title_line(p.get("title_id")),
         "set_rank": lambda p: f"Set rank {get_rank_name(int(p.get('rank', 0)))} for {_user_name(p.get('user_id'))}",
         "send_notification": lambda p: f"Send notification -> {_user_name(p.get('user_id'))}",
         "delete_comment": lambda p: f"Delete comment #{p.get('comment_id')}",
@@ -669,10 +730,14 @@ def corners(
     user: User = Depends(get_current_user), session: Session = Depends(get_session),
 ):
     if has_privilege(user, "admin"):
-        channels = session.exec(select(Corner).order_by(Corner.created_at)).all()
+        channels = session.exec(
+            select(Corner).where(Corner.is_external == False).order_by(Corner.created_at)
+        ).all()
         externals = session.exec(select(Corner).where(Corner.is_external == True).order_by(Corner.created_at)).all()
     else:
-        channels = session.exec(select(Corner).where(Corner.is_hidden == False).order_by(Corner.created_at)).all()
+        channels = session.exec(
+            select(Corner).where(Corner.is_hidden == False, Corner.is_external == False).order_by(Corner.created_at)
+        ).all()
         externals = session.exec(
             select(Corner).where(Corner.is_external == True, Corner.is_hidden == False).order_by(Corner.created_at)
         ).all()
@@ -736,8 +801,10 @@ def library(
     library_corner = session.exec(select(Corner).where(Corner.slug == "library")).first()
     if library_corner and library_corner.is_hidden and not has_privilege(user, "admin"):
         raise HTTPException(status_code=404)
-    available_tags = _available_tags_for_corner(session, library_corner.id if library_corner else None)
+    all_corner_tags = _available_tags_for_corner(session, library_corner.id if library_corner else None)
     can_view_18plus = _user_can_view_18plus(session, user)
+    tag = _sanitize_tag_query_for_user(user, tag, all_corner_tags, can_view_18plus)
+    available_tags = _filter_tags_visible_for_user(user, all_corner_tags, can_view_18plus)
     book_ids = [b.id for b in books if b.id is not None]
     tags_by_book = _load_tags_for_books(session, book_ids)
     visible_books = []
@@ -775,15 +842,15 @@ def book_write(
     user: User = Depends(get_current_user), session: Session = Depends(get_session),
 ):
     title, content = title.strip(), content.strip()
-    pages = [p.strip() for p in content.split("\n---page---\n") if p.strip()]
-    normalized_content = pages[0] if pages else content
-    if not title or not content:
+    parts = _split_book_pages(content)
+    normalized_content = parts[0] if parts else ""
+    if not title or not normalized_content:
         return _tpl("book_write.html", request, session, user, error="Title and content are required.")
     book = Book(title=title, content=normalized_content, author_id=user.id)
     session.add(book)
     session.commit()
-    if pages:
-        for idx, page_content in enumerate(pages, start=1):
+    if len(parts) > 1:
+        for idx, page_content in enumerate(parts, start=1):
             session.add(BookPage(book_id=book.id, page_number=idx, content=page_content))
         session.commit()
     if tag_ids:
@@ -841,7 +908,101 @@ def book_detail(
                 current_page=current_page,
                 total_pages=total_pages,
                 can_view_18plus=can_view_18plus,
-                can_edit_tags=(book.author_id == user.id or has_privilege(user, "admin")))
+                can_edit_tags=(book.author_id == user.id or has_privilege(user, "admin")),
+                can_edit_book=(book.author_id == user.id))
+
+
+@app.get("/corners/library/{book_id}/edit", response_class=HTMLResponse)
+def book_edit_page(
+    book_id: int,
+    request: Request,
+    user: User = Depends(get_current_user),
+    session: Session = Depends(get_session),
+):
+    book = session.get(Book, book_id)
+    if not book:
+        raise HTTPException(status_code=404)
+    if book.author_id != user.id:
+        raise HTTPException(status_code=403, detail="Only the author can edit this book")
+    can_view_18plus = _user_can_view_18plus(session, user)
+    tags_by_book = _load_tags_for_books(session, [book_id])
+    tags = tags_by_book.get(book_id, [])
+    if not _tags_visible_for_user(user, tags, can_view_18plus):
+        raise HTTPException(status_code=403, detail="You cannot view this post.")
+    library_corner = session.exec(select(Corner).where(Corner.slug == "library")).first()
+    all_tags = _available_tags_for_corner(session, library_corner.id if library_corner else None)
+    body = _book_editor_content(session, book)
+    selected_ids = [t.id for t in tags if t.id is not None]
+    return _tpl(
+        "book_edit.html",
+        request,
+        session,
+        user,
+        book=book,
+        body=body,
+        tags=all_tags,
+        selected_tag_ids=selected_ids,
+        can_view_18plus=can_view_18plus,
+    )
+
+
+@app.post("/corners/library/{book_id}/edit", response_class=HTMLResponse)
+def book_edit(
+    book_id: int,
+    request: Request,
+    title: str = Form(..., min_length=1, max_length=200),
+    content: str = Form(..., min_length=1),
+    tag_ids: list[int] | None = Form(default=None),
+    user: User = Depends(get_current_user),
+    session: Session = Depends(get_session),
+):
+    book = session.get(Book, book_id)
+    if not book:
+        raise HTTPException(status_code=404)
+    if book.author_id != user.id:
+        raise HTTPException(status_code=403, detail="Only the author can edit this book")
+    title, content = title.strip(), content.strip()
+    parts = _split_book_pages(content)
+    normalized_content = parts[0] if parts else ""
+    if not title or not normalized_content:
+        library_corner = session.exec(select(Corner).where(Corner.slug == "library")).first()
+        all_tags = _available_tags_for_corner(session, library_corner.id if library_corner else None)
+        can_view_18plus = _user_can_view_18plus(session, user)
+        return _tpl(
+            "book_edit.html",
+            request,
+            session,
+            user,
+            book=book,
+            body=content,
+            tags=all_tags,
+            selected_tag_ids=tag_ids or [],
+            can_view_18plus=can_view_18plus,
+            error="Title and content are required.",
+        )
+    book.title = title
+    book.content = normalized_content
+    book.updated_at = datetime.now(timezone.utc)
+    session.add(book)
+    for row in session.exec(select(BookPage).where(BookPage.book_id == book_id)).all():
+        session.delete(row)
+    if len(parts) > 1:
+        for idx, page_content in enumerate(parts, start=1):
+            session.add(BookPage(book_id=book.id, page_number=idx, content=page_content))
+    session.commit()
+    library_corner = session.exec(select(Corner).where(Corner.slug == "library")).first()
+    library_corner_id = library_corner.id if library_corner else None
+    can_view_18plus = _user_can_view_18plus(session, user)
+    is_admin = has_privilege(user, "admin")
+    for row in session.exec(select(BookTag).where(BookTag.book_id == book_id)).all():
+        session.delete(row)
+    if tag_ids:
+        tags = session.exec(select(Tag).where(Tag.id.in_(tag_ids))).all()  # type: ignore[attr-defined]
+        for t in tags:
+            if _tag_selectable_for_user(user, t, is_admin, can_view_18plus) and t.id is not None and _tag_allowed_in_corner(session, t.id, library_corner_id):
+                session.add(BookTag(book_id=book.id, tag_id=t.id))
+    session.commit()
+    return RedirectResponse(url=f"/corners/library/{book.id}", status_code=status.HTTP_303_SEE_OTHER)
 
 
 @app.post("/corners/library/{book_id}/tags")
@@ -895,8 +1056,10 @@ def suggestions_list(
         raise HTTPException(status_code=404)
     is_approved = tab == "approved"
     items = session.exec(select(Suggestion).where(Suggestion.is_approved == is_approved)).all()
-    available_tags = _available_tags_for_corner(session, suggestion_corner.id if suggestion_corner else None)
+    all_corner_tags = _available_tags_for_corner(session, suggestion_corner.id if suggestion_corner else None)
     can_view_18plus = _user_can_view_18plus(session, user)
+    tag = _sanitize_tag_query_for_user(user, tag, all_corner_tags, can_view_18plus)
+    available_tags = _filter_tags_visible_for_user(user, all_corner_tags, can_view_18plus)
     suggestion_ids = [s.id for s in items if s.id is not None]
     tags_by_s = _load_tags_for_suggestions(session, suggestion_ids)
     items = [
@@ -1075,8 +1238,10 @@ def generic_corner_list(
         posts = session.exec(
             select(Post).where(Post.corner_id == corner.id, Post.is_approved == is_approved)
         ).all()
-        available_tags = _available_tags_for_corner(session, corner.id)
+        all_corner_tags = _available_tags_for_corner(session, corner.id)
         can_view_18plus = _user_can_view_18plus(session, user)
+        tag = _sanitize_tag_query_for_user(user, tag, all_corner_tags, can_view_18plus)
+        available_tags = _filter_tags_visible_for_user(user, all_corner_tags, can_view_18plus)
         post_ids = [p.id for p in posts if p.id is not None]
         tags_by_post = _load_tags_for_posts(session, post_ids)
         posts = [
@@ -1107,8 +1272,10 @@ def generic_corner_list(
         posts = session.exec(
             select(Post).where(Post.corner_id == corner.id).order_by(Post.created_at.desc())
         ).all()
-        available_tags = _available_tags_for_corner(session, corner.id)
+        all_corner_tags = _available_tags_for_corner(session, corner.id)
         can_view_18plus = _user_can_view_18plus(session, user)
+        tag = _sanitize_tag_query_for_user(user, tag, all_corner_tags, can_view_18plus)
+        available_tags = _filter_tags_visible_for_user(user, all_corner_tags, can_view_18plus)
         post_ids = [p.id for p in posts if p.id is not None]
         tags_by_post = _load_tags_for_posts(session, post_ids)
         posts = [
@@ -1420,12 +1587,25 @@ def user_profile(username: str, request: Request, user: User = Depends(get_curre
     is_following = session.exec(
         select(Follow).where(Follow.follower_id == user.id, Follow.following_id == profile.id)
     ).first() is not None
+    profile_externals: list[Corner] = []
+    admin_viewer = has_privilege(user, "admin")
+    for sub in session.exec(
+        select(UserCornerSubscription).where(UserCornerSubscription.user_id == profile.id)
+    ).all():
+        c = session.get(Corner, sub.corner_id)
+        if not c or not c.is_external:
+            continue
+        if c.is_hidden and not admin_viewer:
+            continue
+        profile_externals.append(c)
+    profile_externals.sort(key=lambda x: (x.name or "").lower())
     return _tpl("user_profile.html", request, session, user,
                 profile=profile, books=books, total_views=total_views, titles=titles,
                 corner_stats=cstats, all_saved_titles=all_saved_titles,
                 all_badges=all_badges, profile_badges=profile_badges,
                 user_badge_ids=user_badge_ids, profile_has_privileges=profile_has_privileges,
-                followers_count=followers_count, following_count=following_count, is_following=is_following, **ss)
+                followers_count=followers_count, following_count=following_count, is_following=is_following,
+                profile_externals=profile_externals, **ss)
 
 
 @app.post("/user/{username}/follow")

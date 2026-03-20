@@ -119,10 +119,22 @@
     .justify-between { justify-content: space-between; }
     .flex-wrap { flex-wrap: wrap; }
 
-    .stat-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: .75rem; }
+    .stat-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap: .75rem; }
     .stat-box { background: var(--primary-faint); border-radius: 8px; padding: 1rem; text-align: center; }
     .stat-box .num { font-size: 1.5rem; font-weight: 700; color: var(--primary); }
     .stat-box .label { font-size: .75rem; color: var(--text-muted); margin-top: .15rem; }
+
+    @media (max-width: 640px) {
+      html { font-size: 100%; }
+      .container { margin: 1rem auto; padding: 0 .85rem; }
+      .card { padding: 1.15rem; }
+      .btn { padding: .42rem .85rem; font-size: .8rem; }
+      .btn-sm { padding: .26rem .5rem; font-size: .72rem; }
+      .stat-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: .5rem; }
+      .stat-box { padding: .7rem .45rem; }
+      .stat-box .num { font-size: 1.2rem; }
+      .stat-box .label { font-size: .68rem; }
+    }
 
     table { width: 100%; border-collapse: collapse; }
     th, td { text-align: left; padding: .7rem .85rem; }

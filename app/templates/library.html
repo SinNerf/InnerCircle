@@ -5,6 +5,9 @@
 .header-row { display: flex; align-items: center; justify-content: space-between; margin-bottom: 1.25rem; }
 .header-row h2 { font-size: 1.3rem; }
 .book-list { display: flex; flex-direction: column; gap: .75rem; }
+.book-list-item { display: flex; align-items: flex-start; gap: .5rem; flex-wrap: wrap; }
+.book-list-item .book-card { flex: 1; min-width: 0; }
+.book-list-item .book-edit { flex-shrink: 0; margin-top: .35rem; }
 .book-card { background: var(--bg-card); border-radius: 10px; box-shadow: var(--shadow); padding: 1.25rem; transition: background .2s; display: block; color: var(--text); text-decoration: none; }
 .book-card:hover { text-decoration: none; background: var(--bg-hover); }
 .book-card h3 { font-size: 1rem; margin-bottom: .25rem; }
@@ -20,7 +23,7 @@
 <div class="container">
   <div class="header-row">
     <h2>Library</h2>
-    <a href="/corners/library/write" class="btn btn-primary">Write a Book</a>
+    <a href="/corners/library/write" class="btn btn-primary btn-sm">Write a Book</a>
   </div>
 
   <div class="filters">
@@ -33,20 +36,25 @@
   {% if books %}
   <div class="book-list">
     {% for book in books %}
-    <a href="/corners/library/{{ book.id }}" class="book-card">
-      <h3>{{ book.title }}</h3>
-      <div class="book-meta">
-        <span>
-          by {{
-            (authors[book.author_id].username ~ (' Deleted' if authors[book.author_id].is_deleted else ''))
-            if book.author_id in authors else 'Unknown'
-          }}
-        </span>
-        <span>{{ book.views }} view{{ 's' if book.views != 1 else '' }}</span>
-        <span>Updated {{ book.updated_at.strftime('%b %d, %Y') }}</span>
-      </div>
-      <p class="book-snippet">{{ book.content[:120] }}{{ '...' if book.content|length > 120 else '' }}</p>
-    </a>
+    <div class="book-list-item">
+      <a href="/corners/library/{{ book.id }}" class="book-card">
+        <h3>{{ book.title }}</h3>
+        <div class="book-meta">
+          <span>
+            by {{
+              (authors[book.author_id].username ~ (' Deleted' if authors[book.author_id].is_deleted else ''))
+              if book.author_id in authors else 'Unknown'
+            }}
+          </span>
+          <span>{{ book.views }} view{{ 's' if book.views != 1 else '' }}</span>
+          <span>Updated {{ book.updated_at.strftime('%b %d, %Y') }}</span>
+        </div>
+        <p class="book-snippet">{{ book.content[:120] }}{{ '...' if book.content|length > 120 else '' }}</p>
+      </a>
+      {% if book.author_id == user.id %}
+      <a href="/corners/library/{{ book.id }}/edit" class="btn btn-ghost btn-sm book-edit">Edit</a>
+      {% endif %}
+    </div>
     {% endfor %}
   </div>
   {% else %}

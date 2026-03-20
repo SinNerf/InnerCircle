@@ -13,7 +13,13 @@
 .approve-form { display: flex; gap: .35rem; align-items: center; margin: 0; }
 .approve-form input[name="title"] { width: 130px; margin: 0; padding: .3rem .5rem; font-size: .78rem; }
 .admin-links { display: flex; gap: .75rem; margin-bottom: 1.25rem; }
-.corner-row { background: var(--bg-hover); border-radius: 7px; padding: .65rem .85rem; margin-bottom: .4rem; display: flex; align-items: center; gap: .6rem; }
+.corner-row { background: var(--bg-hover); border-radius: 7px; padding: .65rem .85rem; margin-bottom: .4rem; display: flex; align-items: flex-start; gap: .6rem; flex-wrap: wrap; }
+.corner-row .corner-actions { display: flex; flex-wrap: wrap; gap: .35rem; align-items: center; margin-left: auto; }
+@media (max-width: 520px) {
+  .corner-row .corner-actions { margin-left: 0; width: 100%; justify-content: flex-start; }
+  .broadcast-form .line { flex-direction: column; align-items: stretch; }
+  .broadcast-form .line input[type="text"], .broadcast-form .line select, .broadcast-form .line input[type="number"] { width: 100%; min-width: 0; }
+}
 .corner-row .c-icon { font-size: 1.2rem; flex-shrink: 0; }
 .corner-row .c-info { flex: 1; min-width: 0; }
 .corner-row .c-name { font-weight: 600; font-size: .88rem; }
@@ -169,12 +175,14 @@
           <div class="c-name">{{ c.name }}</div>
           <div class="c-meta">/corners/{{ c.slug }} &middot; {{ c.template_type }}-style{% if c.is_external %} &middot; External ({{ external_counts[c.id] if c.id in external_counts else 0 }} users){% endif %}{% if c.is_hidden %} &middot; Hidden{% endif %}</div>
         </div>
-        <form method="post" action="/admin/corner/{{ c.id }}/toggle-hidden" style="margin:0;">
-          <button class="btn btn-ghost btn-sm" type="submit">{{ 'Unhide' if c.is_hidden else 'Hide' }}</button>
-        </form>
-        <form method="post" action="/admin/corner/{{ c.id }}/delete" style="margin:0;">
-          <button class="btn btn-danger btn-sm" type="submit" onclick="return confirm('Delete this corner permanently?')">Delete</button>
-        </form>
+        <div class="corner-actions">
+          <form method="post" action="/admin/corner/{{ c.id }}/toggle-hidden" style="margin:0;">
+            <button class="btn btn-ghost btn-sm" type="submit">{{ 'Unhide' if c.is_hidden else 'Hide' }}</button>
+          </form>
+          <form method="post" action="/admin/corner/{{ c.id }}/delete" style="margin:0;">
+            <button class="btn btn-danger btn-sm" type="submit" onclick="return confirm('Delete this corner permanently?')">Delete</button>
+          </form>
+        </div>
       </div>
       {% endfor %}
     </div>

@@ -20,7 +20,7 @@ textarea.content-area { min-height: 280px; }
 
       <label for="content">Content</label>
       <textarea id="content" name="content" class="content-area" required placeholder="Share your knowledge..."></textarea>
-      <p class="text-muted text-sm" style="margin-top:.35rem;">Use <code>---page---</code> on a new line to split the book into pages.</p>
+      <p class="text-muted text-sm" style="margin-top:.35rem;">Put <code>---page---</code> on its own line to split pages (works on Windows/Mac/Linux line endings).</p>
 
       {% if tags %}
       <div style="margin-top:1rem;">
@@ -46,7 +46,7 @@ textarea.content-area { min-height: 280px; }
       {% endif %}
 
       <div class="flex gap-1 mt-1">
-        <button class="btn btn-primary btn-block" type="submit">Publish</button>
+        <button class="btn btn-primary" type="submit">Publish</button>
       </div>
     </form>
 

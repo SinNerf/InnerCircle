@@ -6,7 +6,17 @@
 .book-header h1 { font-size: 1.5rem; margin-bottom: .4rem; }
 .book-header .meta { font-size: .82rem; color: var(--text-muted); display: flex; gap: 1rem; flex-wrap: wrap; align-items: center; }
 .book-body { line-height: 1.7; font-size: .92rem; white-space: pre-wrap; word-wrap: break-word; }
-.book-footer { margin-top: 2rem; padding-top: 1rem; border-top: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; }
+.book-actions-top { display: flex; flex-wrap: wrap; gap: .5rem; align-items: center; margin-bottom: .75rem; }
+.book-footer { margin-top: 2rem; padding-top: 1rem; border-top: 1px solid var(--border); display: flex; flex-direction: column; align-items: stretch; gap: 1rem; }
+.book-footer-row { display: flex; flex-wrap: wrap; gap: .5rem; align-items: center; }
+.book-pager { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: .5rem; margin-top: 1rem; }
+.book-pager .pager-muted { font-size: .8rem; color: var(--text-muted); }
+.book-pager .pager-nav { display: flex; gap: .35rem; flex-wrap: wrap; }
+.pager-disabled { opacity: .45; pointer-events: none; cursor: default; }
+@media (max-width: 520px) {
+  .book-header h1 { font-size: 1.25rem; }
+  .book-actions-top .btn { font-size: .78rem; padding: .35rem .65rem; }
+}
 {% endblock %}
 
 {% block body %}
@@ -14,6 +24,11 @@
   <div class="card">
     <div class="book-header">
       <h1>{{ book.title }}</h1>
+      {% if can_edit_book %}
+      <div class="book-actions-top">
+        <a href="/corners/library/{{ book.id }}/edit" class="btn btn-ghost btn-sm">Edit book</a>
+      </div>
+      {% endif %}
       <div class="meta">
         <span>
           by
@@ -27,10 +42,20 @@
     </div>
     <div class="book-body">{{ page_content }}</div>
     {% if total_pages > 1 %}
-      <div style="display:flex; justify-content:space-between; align-items:center; margin-top:1rem;">
-        <a class="btn btn-ghost btn-sm {{ 'disabled' if current_page <= 1 else '' }}" href="/corners/library/{{ book.id }}?page={{ current_page - 1 }}">Previous</a>
-        <span style="font-size:.8rem; color:var(--text-muted);">Page {{ current_page }} of {{ total_pages }}</span>
-        <a class="btn btn-ghost btn-sm {{ 'disabled' if current_page >= total_pages else '' }}" href="/corners/library/{{ book.id }}?page={{ current_page + 1 }}">Next</a>
+      <div class="book-pager">
+        <div class="pager-nav">
+          {% if current_page > 1 %}
+            <a class="btn btn-ghost btn-sm" href="/corners/library/{{ book.id }}?page={{ current_page - 1 }}">Previous</a>
+          {% else %}
+            <span class="btn btn-ghost btn-sm pager-disabled">Previous</span>
+          {% endif %}
+          {% if current_page < total_pages %}
+            <a class="btn btn-ghost btn-sm" href="/corners/library/{{ book.id }}?page={{ current_page + 1 }}">Next</a>
+          {% else %}
+            <span class="btn btn-ghost btn-sm pager-disabled">Next</span>
+          {% endif %}
+        </div>
+        <span class="pager-muted">Page {{ current_page }} of {{ total_pages }}</span>
       </div>
     {% endif %}
 
@@ -52,10 +77,17 @@
     {% endif %}
 
     <div class="book-footer">
-      <a href="/corners/library" class="btn btn-ghost">Back to Library</a>
+      <div class="book-footer-row">
+        <a href="/corners/library" class="btn btn-ghost btn-sm">Back to Library</a>
+        {% if has_privilege(user, "admin") %}
+        <form method="post" action="/corners/library/{{ book.id }}/delete" style="margin:0;">
+          <button class="btn btn-danger btn-sm" type="submit" onclick="return confirm('Delete this book?')">Delete</button>
+        </form>
+        {% endif %}
+      </div>
 
       {% if can_edit_tags %}
-      <div style="width:100%; margin-top:.9rem;">
+      <div style="width:100%;">
         <form method="post" action="/corners/library/{{ book.id }}/tags">
           <div style="font-size:.8rem; font-weight:700; color:var(--text-muted); margin-bottom:.35rem;">Update Tags</div>
           <div style="display:flex; flex-wrap:wrap; gap:.5rem; margin-bottom:.75rem;">
@@ -80,12 +112,6 @@
           <button class="btn btn-primary btn-sm" type="submit">Save Tags</button>
         </form>
       </div>
-      {% endif %}
-
-      {% if has_privilege(user, "admin") %}
-      <form method="post" action="/corners/library/{{ book.id }}/delete" style="margin:0;">
-        <button class="btn btn-danger btn-sm" type="submit" onclick="return confirm('Delete this book?')">Delete</button>
-      </form>
       {% endif %}
     </div>
 

@@ -1,0 +1,55 @@
+{% extends "base.html" %}
+{% block title %}Edit Book — InnerCircle{% endblock %}
+
+{% block extra_css %}
+textarea.content-area { min-height: 280px; }
+{% endblock %}
+
+{% block body %}
+<div class="container" style="max-width:620px;">
+  <div class="card">
+    <h2 style="font-size:1.2rem; margin-bottom:1rem;">Edit Book</h2>
+
+    {% if error %}
+    <div class="alert-error">{{ error }}</div>
+    {% endif %}
+
+    <form method="post" action="/corners/library/{{ book.id }}/edit">
+      <label for="title">Title</label>
+      <input id="title" name="title" type="text" required maxlength="200" value="{{ book.title }}">
+
+      <label for="content">Content</label>
+      <textarea id="content" name="content" class="content-area" required placeholder="Share your knowledge...">{{ body }}</textarea>
+      <p class="text-muted text-sm" style="margin-top:.35rem;">Split pages with <code>---page---</code> on its own line (spaces allowed).</p>
+
+      {% if tags %}
+      <div style="margin-top:1rem;">
+        <label style="margin-bottom:.35rem;">Tags</label>
+        <div style="display:flex; flex-wrap:wrap; gap:.5rem; margin-bottom:1rem;">
+          {% for t in tags %}
+            {% set can_select_illegal = has_privilege(user, 'admin') or user.rank >= t.min_rank %}
+            {% set can_select_18plus = has_privilege(user, 'admin') or can_view_18plus %}
+            {% if (t.tag_type == 'illegal' and not can_select_illegal) or (t.tag_type == '18plus' and not can_select_18plus) %}
+              <label style="opacity:.55; display:flex; align-items:center; gap:.4rem; font-size:.85rem;">
+                <input type="checkbox" disabled>
+                {{ t.name }}
+              </label>
+            {% else %}
+              <label style="display:flex; align-items:center; gap:.4rem; font-size:.85rem;">
+                <input type="checkbox" name="tag_ids" value="{{ t.id }}" {% if t.id in selected_tag_ids %}checked{% endif %}>
+                {{ t.name }}
+              </label>
+            {% endif %}
+          {% endfor %}
+        </div>
+      </div>
+      {% endif %}
+
+      <div class="flex gap-1 mt-1" style="flex-wrap:wrap;">
+        <button class="btn btn-primary" type="submit">Save changes</button>
+        <a href="/corners/library/{{ book.id }}" class="btn btn-ghost">Cancel</a>
+      </div>
+    </form>
+  </div>
+</div>
+{% endblock %}

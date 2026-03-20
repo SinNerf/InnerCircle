@@ -21,14 +21,24 @@
 .mini-form { display: flex; gap: .35rem; align-items: center; margin-bottom: .5rem; flex-wrap: wrap; }
 .mini-form input, .mini-form select, .mini-form textarea { margin-bottom: 0; font-size: .82rem; padding: .35rem .5rem; }
 .profile-log-cta { margin-top: 1rem; padding-top: .9rem; border-top: 1px solid var(--border-light); }
-.profile-log-cta .btn { width: 100%; max-width: 240px; font-size: .88rem; padding: .5rem .95rem; border-radius: 10px; }
+.profile-log-cta .btn { width: 100%; max-width: 220px; }
 .profile-tools { margin-left: auto; }
 .settings-btn { width: 36px; height: 36px; border-radius: 50%; border: 1px solid var(--border); background: var(--bg); color: var(--text); display: inline-flex; align-items: center; justify-content: center; cursor: pointer; font-size: 1rem; transition: border-color .15s, background .15s; }
 .settings-btn:hover { border-color: var(--primary); background: var(--primary-faint); }
 .settings-actions { display: flex; flex-direction: column; gap: .55rem; }
 .reason-modal-form textarea { margin-bottom: .65rem; min-height: 100px; }
 .follow-cta { margin: .75rem 0 0; }
-.follow-cta .btn { width: 100%; max-width: 220px; border-radius: 9px; padding: .42rem .85rem; font-size: .82rem; }
+.follow-cta .btn { width: auto; max-width: 100%; border-radius: 8px; padding: .38rem .75rem; font-size: .8rem; }
+.profile-externals { margin: 1rem 0 1.1rem; padding: .85rem 1rem; background: var(--primary-faint); border-radius: 10px; border: 1px solid var(--border-light); }
+.externals-label { font-size: .78rem; font-weight: 700; text-transform: uppercase; letter-spacing: .05em; color: var(--text-muted); margin: 0 0 .55rem; }
+.externals-label::after { content: ':'; }
+.externals-track { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: .4rem; }
+.externals-track li { margin: 0; padding: 0; }
+.externals-track a { display: inline-flex; align-items: center; gap: .4rem; font-size: .88rem; font-weight: 500; color: var(--primary); text-decoration: none; padding: .28rem .45rem; margin: 0 -.45rem; border-radius: 6px; transition: background .12s; }
+.externals-track a:hover { background: rgba(0,0,0,.06); text-decoration: none; }
+@media (prefers-color-scheme: dark) {
+  .externals-track a:hover { background: rgba(255,255,255,.06); }
+}
 .modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,.55); display: none; align-items: center; justify-content: center; z-index: 40; padding: 1rem; }
 .modal-box { width: min(100%, 560px); max-height: 85vh; overflow: auto; background: var(--bg-card); border-radius: 12px; box-shadow: var(--shadow); padding: 1rem; }
 @media (max-width: 640px) {
@@ -46,6 +56,8 @@
   .modal-box h3 { font-size: 1.05rem !important; }
   .modal-box p { font-size: .95rem !important; line-height: 1.45; }
   .profile-tools { margin-left: 0; }
+  .profile-externals { padding: .75rem .85rem; margin: .85rem 0 .95rem; }
+  .externals-track a { font-size: .92rem; padding: .32rem .5rem; }
 }
 {% endblock %}
 
@@ -206,8 +218,10 @@
       <div class="stat-box"><div class="num">{{ s_up }}</div><div class="label">Upvotes</div></div>
       <div class="stat-box"><div class="num">{{ s_down }}</div><div class="label">Downvotes</div></div>
       <div class="stat-box"><div class="num">{{ s_approved }}</div><div class="label">Approved</div></div>
+      {% if profile.id != user.id %}
       <div class="stat-box"><div class="num">{{ followers_count }}</div><div class="label">Followers</div></div>
       <div class="stat-box"><div class="num">{{ following_count }}</div><div class="label">Following</div></div>
+      {% endif %}
     </div>
 
     {% if books %}
@@ -250,13 +264,26 @@
     {% endfor %}
     {% endif %}
 
-    {% if not books and not suggestions and not corner_stats %}
+    {% if profile_externals %}
+    <div class="profile-externals" aria-label="Externals this user follows">
+      <div class="externals-label">Externals</div>
+      <ul class="externals-track">
+        {% for ext in profile_externals %}
+        <li>
+          <a href="/corners/{{ ext.slug }}">{% if ext.icon %}<span class="externals-icon" aria-hidden="true">{{ ext.icon }}</span>{% endif %}<span>{{ ext.name }}</span></a>
+        </li>
+        {% endfor %}
+      </ul>
+    </div>
+    {% endif %}
+
+    {% if not books and not suggestions and not corner_stats and not profile_externals %}
     <p class="text-muted text-sm" style="font-style:italic;">No activity yet.</p>
     {% endif %}
 
     {% if profile_has_privileges %}
     <div class="profile-log-cta">
-      <a href="/user/{{ profile.username }}/logs" class="btn btn-ghost">Privilege Activity Log</a>
+      <a href="/user/{{ profile.username }}/logs" class="btn btn-ghost btn-sm">Privilege Activity Log</a>
     </div>
     {% endif %}
 
@@ -264,11 +291,11 @@
     <div class="follow-cta">
       {% if is_following %}
         <form method="post" action="/user/unfollow/{{ profile.id }}" style="margin:0;">
-          <button class="btn btn-ghost" type="submit">Following</button>
+          <button class="btn btn-ghost btn-sm" type="submit">Following</button>
         </form>
       {% else %}
         <form method="post" action="/user/follow/{{ profile.id }}" style="margin:0;">
-          <button class="btn btn-primary" type="submit">Follow {{ profile.username }}</button>
+          <button class="btn btn-primary btn-sm" type="submit">Follow {{ profile.username }}</button>
         </form>
       {% endif %}
     </div>
