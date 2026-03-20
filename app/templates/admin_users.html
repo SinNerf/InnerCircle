@@ -5,9 +5,14 @@
 .user-row { background: var(--bg-card); border-radius: 10px; box-shadow: var(--shadow); padding: 1rem 1.25rem; margin-bottom: .75rem; display: flex; justify-content: space-between; align-items: center; gap: .75rem; }
 .user-row .name { font-weight: 600; font-size: .95rem; margin-bottom: .25rem; }
 .user-row .meta { font-size: .75rem; color: var(--text-muted); display: flex; align-items: center; gap: .4rem; flex-wrap: wrap; }
+.tabs-row { display: flex; gap: .45rem; align-items: center; margin-bottom: 1rem; flex-wrap: wrap; }
 @media (max-width: 480px) {
   .user-row { flex-direction: column; align-items: flex-start; gap: .5rem; }
   .user-row .btn { align-self: flex-end; }
+  .tabs-row { gap: .35rem; }
+  .tabs-row .btn { font-size: .84rem; padding: .45rem .6rem; }
+  .user-row .name { font-size: 1rem; }
+  .user-row .meta { font-size: .84rem; line-height: 1.35; }
 }
 {% endblock %}
 
@@ -18,15 +23,15 @@
     <a href="/admin" class="btn btn-ghost btn-sm">Back to Admin</a>
   </div>
 
-  <div class="flex gap-1 items-center" style="margin-bottom:1rem;">
+  <div class="tabs-row">
     <a href="/admin/users?tab=active" class="btn btn-sm {{ 'btn-primary' if tab == 'active' else 'btn-ghost' }}">
-      Active ({{ active_count }})
+      Active ({{ active_count|default(0, true) }})
     </a>
     <a href="/admin/users?tab=banned" class="btn btn-sm {{ 'btn-primary' if tab == 'banned' else 'btn-ghost' }}">
-      Banned ({{ banned_count }})
+      Banned ({{ banned_count|default(0, true) }})
     </a>
     <a href="/admin/users?tab=deleted" class="btn btn-sm {{ 'btn-primary' if tab == 'deleted' else 'btn-ghost' }}">
-      Deleted ({{ deleted_count }})
+      Deleted ({{ deleted_count|default(0, true) }})
     </a>
   </div>
 

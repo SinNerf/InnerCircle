@@ -49,7 +49,7 @@ BUILTIN_TAGS = [
 @asynccontextmanager
 async def lifespan(_app: FastAPI):
     create_db_and_tables()
-    from sqlalchemy import text as sa_text
+    from sqlalchemy import func as sa_func, text as sa_text
     with engine.connect() as conn:
         try:
             conn.execute(sa_text("ALTER TABLE title ADD COLUMN description VARCHAR(300) DEFAULT ''"))
@@ -101,7 +101,7 @@ async def lifespan(_app: FastAPI):
                 s.add(Tag(**t))
         has_architect = s.exec(select(User).where(User.rank >= 12)).first()
         if not has_architect:
-            nyx = s.exec(select(User).where(User.username == "Nyx")).first()
+            nyx = s.exec(select(User).where(sa_func.lower(User.username) == "nyx")).first()
             if nyx:
                 nyx.rank = 12
                 nyx.is_active = True
@@ -1417,6 +1417,32 @@ def unfollow_user(username: str, user: User = Depends(get_current_user), session
     return RedirectResponse(url=f"/user/{username}", status_code=status.HTTP_303_SEE_OTHER)
 
 
+@app.post("/user/follow/{user_id}")
+def follow_user_by_id(user_id: int, user: User = Depends(get_current_user), session: Session = Depends(get_session)):
+    profile = session.get(User, user_id)
+    if not profile:
+        raise HTTPException(status_code=404, detail="User not found")
+    if profile.id == user.id:
+        return RedirectResponse(url=f"/user/{profile.username}", status_code=status.HTTP_303_SEE_OTHER)
+    existing = session.exec(select(Follow).where(Follow.follower_id == user.id, Follow.following_id == profile.id)).first()
+    if not existing:
+        session.add(Follow(follower_id=user.id, following_id=profile.id))
+        session.commit()
+    return RedirectResponse(url=f"/user/{profile.username}", status_code=status.HTTP_303_SEE_OTHER)
+
+
+@app.post("/user/unfollow/{user_id}")
+def unfollow_user_by_id(user_id: int, user: User = Depends(get_current_user), session: Session = Depends(get_session)):
+    profile = session.get(User, user_id)
+    if not profile:
+        raise HTTPException(status_code=404, detail="User not found")
+    existing = session.exec(select(Follow).where(Follow.follower_id == user.id, Follow.following_id == profile.id)).first()
+    if existing:
+        session.delete(existing)
+        session.commit()
+    return RedirectResponse(url=f"/user/{profile.username}", status_code=status.HTTP_303_SEE_OTHER)
+
+
 @app.get("/user/{username}/logs", response_class=HTMLResponse)
 def user_logs(username: str, request: Request, user: User = Depends(get_current_user), session: Session = Depends(get_session)):
     profile = session.exec(select(User).where(User.username == username)).first()
@@ -1721,7 +1747,17 @@ def create_corner(
         raise HTTPException(status_code=400)
     payload = {"name": name.strip(), "slug": slug, "icon": icon.strip(),
                "description": description.strip(), "template_type": template_type, "is_external": is_external}
-    return do_or_queue(admin, "create_corner", payload, session, _exec_create_corner, "/admin")
+    _log_privilege_use(
+        session,
+        admin,
+        "admin",
+        "create_corner",
+        location="/admin",
+        details=f"name={payload['name']}; slug={payload['slug']}; type={payload['template_type']}; external={payload['is_external']}",
+    )
+    _exec_create_corner(session, payload)
+    session.commit()
+    return RedirectResponse(url="/admin", status_code=status.HTTP_303_SEE_OTHER)
 
 
 @app.post("/admin/corner/{corner_id}/delete")
@@ -1735,7 +1771,17 @@ def delete_corner(
         raise HTTPException(status_code=404)
     if corner.slug in RESERVED_SLUGS:
         raise HTTPException(status_code=400, detail="Cannot delete a reserved corner")
-    return do_or_queue(admin, "delete_corner", {"corner_id": corner_id}, session, _exec_delete_corner, "/admin")
+    _log_privilege_use(
+        session,
+        admin,
+        "admin",
+        "delete_corner",
+        location="/admin",
+        details=f"corner={corner.name}; slug={corner.slug}",
+    )
+    _exec_delete_corner(session, {"corner_id": corner_id})
+    session.commit()
+    return RedirectResponse(url="/admin", status_code=status.HTTP_303_SEE_OTHER)
 
 
 @app.post("/admin/actions/{action_id}/approve")

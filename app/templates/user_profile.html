@@ -20,6 +20,23 @@
 .admin-forms h3 { font-size: .88rem; margin-bottom: .5rem; }
 .mini-form { display: flex; gap: .35rem; align-items: center; margin-bottom: .5rem; flex-wrap: wrap; }
 .mini-form input, .mini-form select, .mini-form textarea { margin-bottom: 0; font-size: .82rem; padding: .35rem .5rem; }
+.modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,.55); display: none; align-items: center; justify-content: center; z-index: 40; padding: 1rem; }
+.modal-box { width: min(100%, 560px); max-height: 85vh; overflow: auto; background: var(--bg-card); border-radius: 12px; box-shadow: var(--shadow); padding: 1rem; }
+@media (max-width: 640px) {
+  .profile-header h1 { font-size: 1.18rem; line-height: 1.25; }
+  .profile-bio { font-size: .95rem; }
+  .profile-meta { font-size: .86rem; line-height: 1.4; }
+  .section-label { font-size: 1rem; }
+  .item-row { align-items: flex-start; flex-direction: column; gap: .2rem; }
+  .item-row a { font-size: .95rem; line-height: 1.35; }
+  .item-row .detail { font-size: .86rem; }
+  .mini-form { width: 100%; }
+  .mini-form textarea { width: 100%; min-height: 72px; font-size: .92rem; }
+  .mini-form input, .mini-form select { width: 100%; font-size: .92rem; }
+  .admin-forms h3, .admin-forms h4 { font-size: .95rem !important; }
+  .modal-box h3 { font-size: 1.05rem !important; }
+  .modal-box p { font-size: .95rem !important; line-height: 1.45; }
+}
 {% endblock %}
 
 {% block body %}
@@ -44,11 +61,11 @@
         {% if profile.id != user.id %}
           <div style="margin-top:.5rem;">
             {% if is_following %}
-              <form method="post" action="/user/{{ profile.username }}/unfollow" style="margin:0;">
+              <form method="post" action="/user/unfollow/{{ profile.id }}" style="margin:0;">
                 <button class="btn btn-ghost btn-sm" type="submit">Unfollow</button>
               </form>
             {% else %}
-              <form method="post" action="/user/{{ profile.username }}/follow" style="margin:0;">
+              <form method="post" action="/user/follow/{{ profile.id }}" style="margin:0;">
                 <button class="btn btn-primary btn-sm" type="submit">Follow</button>
               </form>
             {% endif %}
