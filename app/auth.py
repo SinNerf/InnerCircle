@@ -7,6 +7,7 @@ from sqlmodel import Session, select
 
 from app.config import APP_SECRET, TOKEN_EXPIRE_MINUTES
 from app.models import User, get_session
+from app.ranks import user_rank
 
 ALGORITHM = "HS256"
 
@@ -59,12 +60,12 @@ def get_current_user(
 
 
 def get_current_admin(user: User = Depends(get_current_user)) -> User:
-    if user.rank < 11:
+    if user_rank(user) < 11:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Admin access required")
     return user
 
 
 def get_current_architect(user: User = Depends(get_current_user)) -> User:
-    if user.rank < 12:
+    if user_rank(user) < 12:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Architect access required")
     return user

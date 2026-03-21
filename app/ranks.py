@@ -22,12 +22,24 @@ PRIVILEGES = {
 }
 
 
-def get_rank_name(level: int) -> str:
-    return RANKS.get(level, "Unknown")
+def user_rank(user) -> int:
+    try:
+        r = int(getattr(user, "rank", 1))
+    except (TypeError, ValueError):
+        return 1
+    return r
+
+
+def get_rank_name(level) -> str:
+    try:
+        lvl = int(level)
+    except (TypeError, ValueError):
+        return "Unknown"
+    return RANKS.get(lvl, "Unknown")
 
 
 def has_privilege(user, privilege: str) -> bool:
     min_rank = PRIVILEGES.get(privilege)
     if min_rank is None:
         return False
-    return user.rank >= min_rank
+    return user_rank(user) >= min_rank

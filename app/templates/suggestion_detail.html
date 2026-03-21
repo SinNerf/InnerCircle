@@ -71,7 +71,7 @@
           <div style="display:flex; flex-wrap:wrap; gap:.5rem; margin-bottom:.75rem;">
             {% for t in all_tags %}
               {% set locked = false %}
-              {% if t.tag_type in ('illegal', 'rank_gated') and not (has_privilege(user, 'admin') or user.rank >= t.min_rank) %}{% set locked = true %}{% endif %}
+              {% if t.tag_type in ('illegal', 'rank_gated') and not (has_privilege(user, 'admin') or user_rank(user) >= t.min_rank) %}{% set locked = true %}{% endif %}
               {% if t.tag_type == '18plus' and not (has_privilege(user, 'admin') or can_view_18plus) %}{% set locked = true %}{% endif %}
               {% if t.tag_type == 'badge_gated' and not (has_privilege(user, 'admin') or (t.required_badge_id and t.required_badge_id in user_badge_ids)) %}{% set locked = true %}{% endif %}
               <label style="display:flex; align-items:center; gap:.4rem; opacity:{{ '0.55' if locked else '1' }};">

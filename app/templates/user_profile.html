@@ -72,7 +72,7 @@
       <div>
         <h1>{{ profile.username }}{% if profile.is_deleted %} Deleted{% endif %}</h1>
         <div class="badges">
-          <span class="rank-badge">{{ get_rank_name(profile.rank) }}</span>
+          <span class="rank-badge">{{ get_rank_name(user_rank(profile)) }}</span>
           {% if profile.is_deleted %}
             <button type="button" class="badge badge-banned" style="cursor:pointer;" onclick="openDeleteReasonModal()">Deleted</button>
           {% elif profile.is_banned %}
@@ -80,14 +80,14 @@
           {% endif %}
         </div>
       </div>
-      {% if has_privilege(user, "admin") and profile.rank < user.rank and not profile.is_deleted %}
+      {% if has_privilege(user, "admin") and user_rank(profile) < user_rank(user) and not profile.is_deleted %}
       <div class="profile-tools">
         <button type="button" class="settings-btn" onclick="openModerationModal()" title="User settings" aria-label="User settings">&#9881;</button>
       </div>
       {% endif %}
     </div>
 
-    {% if has_privilege(user, "admin") and profile.rank < user.rank and not profile.is_deleted %}
+    {% if has_privilege(user, "admin") and user_rank(profile) < user_rank(user) and not profile.is_deleted %}
     <div id="moderationModal" class="modal-overlay" style="display:none;" onclick="if(event.target===this)closeModerationModal()">
       <div class="modal-box">
         <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:.9rem;">
@@ -98,7 +98,7 @@
           {% if not profile.is_banned %}
           <button class="btn btn-danger" type="button" onclick="openBanActionModal()">Ban User</button>
           {% endif %}
-          {% if profile.rank < 11 %}
+          {% if user_rank(profile) < 11 %}
           <button class="btn btn-danger" type="button" onclick="openDeleteActionModal()">Delete User</button>
           {% endif %}
         </div>
@@ -121,7 +121,7 @@
     </div>
     {% endif %}
 
-    {% if profile.rank < 11 %}
+    {% if user_rank(profile) < 11 %}
     <div id="deleteActionModal" class="modal-overlay" style="display:none;" onclick="if(event.target===this)closeDeleteActionModal()">
       <div class="modal-box">
         <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:.9rem;">
@@ -290,7 +290,7 @@
     <p class="text-muted text-sm" style="font-style:italic;">No activity yet.</p>
     {% endif %}
 
-    {% if profile_has_privileges %}
+    {% if can_view_privilege_log %}
     <div class="profile-log-cta">
       <a href="/user/{{ profile.username }}/logs" class="btn btn-ghost btn-sm">Privilege Activity Log</a>
     </div>
@@ -339,8 +339,8 @@
         <form method="post" action="/admin/rank/{{ profile.id }}" style="display:flex; gap:.35rem; align-items:center; margin:0;">
           <select name="rank" style="width:150px;">
             {% for lvl, name in RANKS.items() %}
-              {% if lvl <= user.rank %}
-              <option value="{{ lvl }}" {{ 'selected' if lvl == profile.rank else '' }}>{{ lvl }}. {{ name }}</option>
+              {% if lvl <= user_rank(user) %}
+              <option value="{{ lvl }}" {{ 'selected' if lvl == user_rank(profile) else '' }}>{{ lvl }}. {{ name }}</option>
               {% endif %}
             {% endfor %}
           </select>

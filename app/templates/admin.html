@@ -63,7 +63,7 @@
     </form>
   </div>
 
-  {% if user.rank >= 12 and pending_actions %}
+  {% if user_rank(user) >= 12 and pending_actions %}
   <div class="section">
     <h2>Pending Admin Actions</h2>
     {% for a in pending_actions %}

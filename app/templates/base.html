@@ -190,7 +190,7 @@
       {% if user is defined and user %}
       <a href="/corners">Corners</a>
       <a href="/dashboard">Dashboard</a>
-      {% if user.rank >= 11 %}<a href="/admin">Admin</a>{% endif %}
+      {% if user_rank(user) >= 11 %}<a href="/admin">Admin</a>{% endif %}
       <a href="/notifications" class="notif-link">&#128276;{% if unread_count %}<span class="notif-badge">{{ unread_count }}</span>{% endif %}</a>
       <a href="/logout">Log out</a>
       {% endif %}

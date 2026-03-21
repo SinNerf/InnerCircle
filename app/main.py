@@ -24,12 +24,13 @@ from app.models import (
     PrivilegeLog, Suggestion, SuggestionTag, Tag, TagCornerAccess, Title, User, UserBadge, Vote, UserCornerSubscription,
     create_db_and_tables, engine, get_session,
 )
-from app.ranks import RANKS, get_rank_name, has_privilege
+from app.ranks import RANKS, get_rank_name, has_privilege, user_rank
 
 TEMPLATES_DIR = Path(__file__).resolve().parent / "templates"
 templates = Jinja2Templates(directory=str(TEMPLATES_DIR))
 templates.env.globals["get_rank_name"] = get_rank_name
 templates.env.globals["has_privilege"] = has_privilege
+templates.env.globals["user_rank"] = user_rank
 templates.env.globals["RANKS"] = RANKS
 
 COOKIE = dict(key="access_token", httponly=True, samesite="none", secure=True)
@@ -239,7 +240,7 @@ def _tag_visible_for_user(session: Session, user: User, tag: Tag) -> bool:
     if tt == "normal":
         return True
     if tt in ("illegal", "rank_gated"):
-        return user.rank >= tag.min_rank
+        return user_rank(user) >= int(tag.min_rank or 1)
     if tt == "18plus":
         return _user_can_view_18plus(session, user)
     if tt == "badge_gated":
@@ -287,7 +288,7 @@ def _tag_selectable_for_user(session: Session, user: User, tag: Tag, is_admin: b
     if tt == "normal":
         return True
     if tt in ("illegal", "rank_gated"):
-        return user.rank >= tag.min_rank
+        return user_rank(user) >= int(tag.min_rank or 1)
     if tt == "18plus":
         return _user_can_view_18plus(session, user)
     if tt == "badge_gated":
@@ -718,7 +719,7 @@ def do_or_queue(admin, action_type, payload, session, execute_fn, redirect_url):
         location=redirect_url,
         details=json.dumps(payload, ensure_ascii=True),
     )
-    if admin.rank >= 12:
+    if user_rank(admin) >= 12:
         execute_fn(session, payload)
         if action_type == "set_rank":
             _ensure_architect_exists(session)
@@ -1640,13 +1641,19 @@ def user_profile(username: str, request: Request, user: User = Depends(get_curre
         profile_externals.append(c)
     profile_externals.sort(key=lambda x: (x.name or "").lower())
     can_edit_bio = profile.id == user.id or has_privilege(user, "admin")
+    can_view_privilege_log = (
+        profile_has_privileges
+        and (user_rank(user) >= 3 or has_privilege(user, "admin"))
+        and (profile.id == user.id or has_privilege(user, "admin"))
+    )
     return _tpl("user_profile.html", request, session, user,
                 profile=profile, books=books, total_views=total_views, titles=titles,
                 corner_stats=cstats, all_saved_titles=all_saved_titles,
                 all_badges=all_badges, profile_badges=profile_badges,
                 profile_badge_ids=profile_badge_ids, profile_has_privileges=profile_has_privileges,
                 followers_count=followers_count, following_count=following_count, is_following=is_following,
-                profile_externals=profile_externals, can_edit_bio=can_edit_bio, **ss)
+                profile_externals=profile_externals, can_edit_bio=can_edit_bio,
+                can_view_privilege_log=can_view_privilege_log, **ss)
 
 
 @app.post("/user/{username}/bio", response_class=HTMLResponse)
@@ -1736,7 +1743,7 @@ def user_logs(username: str, request: Request, user: User = Depends(get_current_
     if not profile:
         raise HTTPException(status_code=404)
     is_admin = has_privilege(user, "admin")
-    if user.rank < 3 and not is_admin:
+    if user_rank(user) < 3 and not is_admin:
         raise HTTPException(status_code=403, detail="Rank 3+ required")
     if not is_admin and profile.id != user.id:
         raise HTTPException(status_code=403, detail="Not allowed")
@@ -1869,7 +1876,7 @@ def admin_panel(
     pending_actions = []
     a_admins: dict[int, User] = {}
     action_summaries: dict[int, str] = {}
-    if admin.rank >= 12:
+    if user_rank(admin) >= 12:
         raw = session.exec(select(AdminAction).where(AdminAction.status == "pending").order_by(AdminAction.created_at)).all()
         for act in raw:
             pending_actions.append(act)
@@ -1961,7 +1968,7 @@ def ban_user(
     u = session.get(User, user_id)
     if not u:
         raise HTTPException(status_code=404)
-    if u.rank >= 11:
+    if user_rank(u) >= 11:
         raise HTTPException(status_code=400, detail="Cannot ban an admin")
     return do_or_queue(
         admin,
@@ -1993,9 +2000,9 @@ def delete_user(
         raise HTTPException(status_code=404)
     if u.id == admin.id:
         raise HTTPException(status_code=400, detail="Cannot delete yourself")
-    if u.rank >= 11:
+    if user_rank(u) >= 11:
         raise HTTPException(status_code=400, detail="Cannot delete an admin")
-    if u.rank >= admin.rank:
+    if user_rank(u) >= user_rank(admin):
         raise HTTPException(status_code=403, detail="Insufficient rank to delete this user")
     return do_or_queue(
         admin,
@@ -2032,7 +2039,7 @@ def set_rank(user_id: int, rank: int = Form(...), admin: User = Depends(get_curr
         raise HTTPException(status_code=404)
     if rank < 1 or rank > 12:
         raise HTTPException(status_code=400, detail="Invalid rank")
-    if rank >= 12 and admin.rank < 12:
+    if rank >= 12 and user_rank(admin) < 12:
         raise HTTPException(status_code=403, detail="Only Architect can assign rank 12")
     return do_or_queue(admin, "set_rank", {"user_id": user_id, "rank": rank}, session, _exec_set_rank, f"/user/{u.username}")
 

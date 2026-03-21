@@ -18,7 +18,7 @@
   <div class="card mb-2">
     <h1 class="greeting">Hello, {{ user.username }}</h1>
     <div style="margin:.35rem 0;">
-      <span class="rank-badge">{{ get_rank_name(user.rank) }}</span>
+      <span class="rank-badge">{{ get_rank_name(user_rank(user)) }}</span>
     </div>
     {% if titles %}
     <div style="margin:.3rem 0 .5rem;">
