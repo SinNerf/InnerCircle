@@ -152,9 +152,11 @@ def _tpl(name, request, session=None, user=None, status_code=200, **ctx):
         )).all())
         if "user_badge_ids" not in ctx:
             ctx["user_badge_ids"] = {
-                ub.badge_id
-                for ub in session.exec(select(UserBadge.badge_id).where(UserBadge.user_id == user.id)).all()  # type: ignore[attr-defined]
-                if ub.badge_id is not None
+                bid
+                for bid in session.exec(
+                    select(UserBadge.badge_id).where(UserBadge.user_id == user.id)  # type: ignore[arg-type]
+                ).all()
+                if bid is not None
             }
         if "can_view_18plus" not in ctx:
             ctx["can_view_18plus"] = _user_can_view_18plus(session, user)
@@ -225,10 +227,16 @@ def _corner_stats(session: Session, user_id: int) -> list[dict]:
 
 def _user_can_view_18plus(session: Session, user: User) -> bool:
     user_badge_ids = {
-        ub.badge_id for ub in session.exec(select(UserBadge.badge_id).where(UserBadge.user_id == user.id)).all()  # type: ignore[attr-defined]
+        bid
+        for bid in session.exec(
+            select(UserBadge.badge_id).where(UserBadge.user_id == user.id)  # type: ignore[arg-type]
+        ).all()
+        if bid is not None
     }
     allowed_badge_ids = {
-        b.id for b in session.exec(select(Badge.id).where(Badge.can_view_18plus == True)).all()
+        bid
+        for bid in session.exec(select(Badge.id).where(Badge.can_view_18plus == True)).all()  # type: ignore[arg-type]
+        if bid is not None
     }
     return bool(user_badge_ids & allowed_badge_ids)
 
